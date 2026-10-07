@@ -79,14 +79,20 @@ try {
   await sleep(2500);
   note(await A.page.isVisible("#desk"), "Se abre el escritorio de llamada");
   await A.page.screenshot({ path: `${OUT}/04-escritorio.png` });
+  // elige siempre la respuesta que más confianza da
   for (let i = 0; i < 3; i++) {
-    await A.page.keyboard.press("1");
+    const best = await A.page.evaluate(() => {
+      const ui = window.__game.ui;
+      const opts = ui.current.rounds[ui.roundIdx].options;
+      return opts.indexOf(opts.reduce((a, b) => (b.trust > a.trust ? b : a)));
+    });
+    await A.page.keyboard.press(String(best + 1));
     await sleep(2100);
   }
   await sleep(500);
   await A.page.screenshot({ path: `${OUT}/05-resultado.png` });
   const result = (await A.page.textContent("#c-result")).replace(/\s+/g, " ").trim();
-  note(/puntos de cuota/.test(result), `Resultado de llamada: ${result.slice(0, 80)}`);
+  note(/TRATO CERRADO.*puntos de cuota/.test(result), `Resultado de llamada: ${result.slice(0, 80)}`);
   await A.page.keyboard.press("Enter");
   await sleep(1500);
   const scoreA = await A.page.textContent("#h-score");

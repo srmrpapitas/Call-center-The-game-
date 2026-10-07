@@ -1,362 +1,314 @@
-// Llamadas de la v0: guionizadas, con clientes ficticios y absurdos (sátira de humor negro).
-// Cada línea busca su audio en public/audio/calls/ con el nombre que da audioFile() (p. ej.
-// vlad_r1_cliente.mp3). Si el archivo no existe, se muestra solo el texto. Los campos `audio`
-// sirven para usar otro nombre o formato. La lista completa: `npm run guion` (GUION-AUDIOS.md).
+// Llamadas: parodia de humor negro de los call center que estafan. Víctimas y empresas ficticias;
+// las estafas son absurdas y no enseñan ninguna técnica real.
+//
+// Cada respuesta sube o baja la CONFIANZA del cliente. Si llega a TRUST_WIN se cierra el trato al
+// momento; si cae a 0, cuelga. Al acabar las rondas, con TRUST_DEAL o más también hay trato.
+// El cliente reacciona con frases genéricas (react) que valen para muchas respuestas, así que cada
+// cliente necesita pocos audios. En los textos, {alias} se cambia por el alias del empleado.
+//
+// Audios: public/audio/calls/<id>_<clave>.mp3 (p. ej. doris_r1_cliente.mp3, doris_bien1.mp3).
+// La lista completa: `npm run guion` (GUION-AUDIOS.md). Si falta un audio, solo se ve el texto.
 
 export interface CallOption {
-  t: string; // lo que dice el jugador
-  pts: 0 | 1 | 3;
-  reply: string; // reacción del cliente
-  audio?: string;
-  replyAudio?: string;
+  t: string; // lo que dice el empleado
+  trust: number; // cuánto sube o baja la confianza
 }
 
 export interface CallRound {
   say: string; // lo que dice el cliente
-  sayAudio?: string;
   options: [CallOption, CallOption, CallOption];
 }
+
+export type Reaction = "bien1" | "bien2" | "duda1" | "duda2" | "mal" | "trato" | "cuelga";
 
 export interface CallDef {
   id: string;
   customer: string;
   emoji: string;
-  product: string;
+  scam: string; // el timo de la llamada
   rounds: CallRound[];
+  react: Record<Reaction, string>;
 }
+
+export const TRUST_START = 25;
+export const TRUST_WIN = 100;
+export const TRUST_DEAL = 70;
+const GOOD = 30;
+const MEH = 5;
+const BAD = -20;
+
+export const REACTION_INFO: Record<Reaction, string> = {
+  bien1: "le convence (1)",
+  bien2: "le convence (2)",
+  duda1: "duda (1)",
+  duda2: "duda (2)",
+  mal: "se mosquea",
+  trato: "TRATO CERRADO",
+  cuelga: "CUELGA",
+};
 
 export const CALLS: CallDef[] = [
   {
-    id: "vlad",
-    customer: "Conde Vlad",
-    emoji: "🧛",
-    product: "Seguro Solar Total",
+    id: "doris",
+    customer: "Doris, 84 años",
+    emoji: "👵",
+    scam: "Soporte técnico de Microsofty",
     rounds: [
       {
-        say: "¿Diga? Rápido, que se hace de día.",
+        say: "¿Hola? ¿Eres tú, Timmy? ¡Nunca me llamas!",
         options: [
-          { t: "¡Justo por eso llamo! El Seguro Solar Premium cubre amaneceres imprevistos.", pts: 3, reply: "Hmm... eso sí me inquieta." },
-          { t: "Tengo una oferta exclusiva solo para usted.", pts: 1, reply: "Todos dicen eso. Mi último vendedor... también." },
-          { t: "¿Es usted el titular de la línea?", pts: 0, reply: "Soy titular desde 1462. Qué pesado." },
+          { t: "Buenos días, señora, la llamo por su ordenador.", trust: MEH },
+          { t: "Sí, abuela… digo, soy {alias}, del soporte técnico de Microsofty. Su ordenador nos ha llamado llorando.", trust: GOOD },
+          { t: "No soy Timmy. Timmy no la quiere. Deme su tarjeta.", trust: BAD },
         ],
       },
       {
-        say: "¿Y qué cubre exactamente?",
+        say: "¿Mi ordenador? Si solo lo uso para el solitario y para ver fotos de gatos.",
         options: [
-          { t: "Quemaduras, pánico solar y selfies con flash. Por 9,99 al mes.", pts: 3, reply: "Barato para ser eterno." },
-          { t: "Cubre... cosas. Muchas cosas.", pts: 1, reply: "Qué específico." },
-          { t: "No lo sé, mi guion no dice más.", pts: 0, reply: "Qué honestidad tan inútil." },
+          { t: "El solitario es ilegal desde ayer.", trust: BAD },
+          { t: "Puede que tenga un problema… técnico.", trust: MEH },
+          { t: "Exacto: los gatos traen virus. Lo dice la ciencia de Microsofty.", trust: GOOD },
         ],
       },
       {
-        say: "¿Y si no quedo satisfecho?",
+        say: "¿Y qué tengo que hacer, cielo?",
         options: [
-          { t: "Le devolvemos su dinero... en un cupón para otro seguro.", pts: 3, reply: "Brillante. Me encanta su falta de escrúpulos." },
-          { t: "Habría un proceso de reclamación de seis a ocho siglos.", pts: 1, reply: "Tiempo me sobra." },
-          { t: "Eso no pasa nunca, jamás.", pts: 0, reply: "Mentira. Huelo el miedo." },
+          { t: "Nada, Doris: léame los números de su tarjeta y yo le espanto los gatos víricos.", trust: GOOD },
+          { t: "Sobrevivir a su ordenador, básicamente.", trust: BAD },
+          { t: "Pues comprar un antivirus, supongo.", trust: MEH },
         ],
       },
     ],
+    react: {
+      bien1: "Ay, qué chico más educado.",
+      bien2: "Eso tiene sentido, como el horóscopo.",
+      duda1: "I don't know… se lo voy a preguntar a mi gato.",
+      duda2: "Mmm… ¿seguro que no eres Timmy?",
+      mal: "¡Oiga! ¡Que tengo 84 años, no soy tonta!",
+      trato: "Espera, que busco las gafas… La tarjeta empieza por 4… ¿Quieres también el PIN, cariño?",
+      cuelga: "Voy a llamar a Timmy. Al de verdad.",
+    },
   },
   {
-    id: "zorg",
-    customer: "Zorg el Alienígena",
-    emoji: "👽",
-    product: "Parcelas en la Luna",
+    id: "gary",
+    customer: "Gary, el conspiranoico",
+    emoji: "🧢",
+    scam: "Devolución de la Agencia Fiscal Federal",
     rounds: [
       {
-        say: "Saludos, humano. ¿Con quién hablo?",
+        say: "¿Quién es? ¿Cómo has conseguido este número? Lo cambio todos los martes.",
         options: [
-          { t: "¡Con su nuevo asesor inmobiliario lunar de confianza!", pts: 3, reply: "Confianza: concepto terrícola. Interesante." },
-          { t: "Con... la empresa.", pts: 1, reply: "¿Cuál de todas?" },
-          { t: "Con nadie importante.", pts: 0, reply: "Entonces cuelgo." },
+          { t: "Me lo ha dado la NSA, como a todo el mundo.", trust: BAD },
+          { t: "Gary, soy el agente {alias}. El gobierno le debe dinero. Sí, a usted.", trust: GOOD },
+          { t: "Le llamo de una agencia oficial.", trust: MEH },
         ],
       },
       {
-        say: "¿Las parcelas tienen vistas?",
+        say: "El gobierno nunca devuelve nada. Esto huele a trampa.",
         options: [
-          { t: "A la Tierra, a pie de cráter y sin vecinos ruidosos.", pts: 3, reply: "Silencio... precioso." },
-          { t: "Algunas parcelas tienen vistas.", pts: 1, reply: "¿Algunas?" },
-          { t: "Es la Luna, no hay mucho que ver.", pts: 0, reply: "Qué pésimo vendedor." },
+          { t: "Por eso le llamamos en secreto, desde un sótano, sin que se entere el gobierno.", trust: GOOD },
+          { t: "Es un procedimiento normal, de verdad.", trust: MEH },
+          { t: "Sí, es una trampa, pero de las buenas.", trust: BAD },
         ],
       },
       {
-        say: "¿Cómo se paga en su planeta?",
+        say: "Vale. ¿Cómo me pagáis? No me fío de los bancos.",
         options: [
-          { t: "En créditos galácticos o en polvo estelar, lo que prefiera.", pts: 3, reply: "Polvo estelar me sobra. Trato." },
-          { t: "Hay que firmar aquí, y ya.", pts: 1, reply: "Presión: sensación desagradable." },
-          { t: "No sé, pregúntele a mi jefe.", pts: 0, reply: "¿Y quién es su jefe?" },
+          { t: "Por transferencia, como todo el mundo.", trust: MEH },
+          { t: "En bitcoins que guardamos en un calcetín.", trust: BAD },
+          { t: "Deme sus datos bancarios y se lo ingresamos antes de que los lagartos se den cuenta.", trust: GOOD },
         ],
       },
     ],
+    react: {
+      bien1: "Lo sabía. Siempre lo supe.",
+      bien2: "Eso es justo lo que diría alguien de dentro… Me gusta.",
+      duda1: "I don't know, man… se oye un ventilador raro de fondo.",
+      duda2: "Hmm. Tengo que consultarlo con mi foro.",
+      mal: "¡Eres un lagarto! ¡Lo noto en la voz!",
+      trato: "Apunta rápido, que nos escuchan: el número de cuenta es…",
+      cuelga: "Me voy al búnker. No vuelvas a llamar.",
+    },
   },
   {
-    id: "reginald",
-    customer: "Sir Reginald",
-    emoji: "🏰",
-    product: "VPN para Castillos",
+    id: "karen",
+    customer: "Karen, quiere hablar con tu encargado",
+    emoji: "💅",
+    scam: "Reembolso de un pedido que nunca hizo",
     rounds: [
       {
-        say: "¡Alto! ¿Quién osa llamar a mi torre?",
+        say: "¿Quién es? Si es publicidad, exijo hablar con tu encargado.",
         options: [
-          { t: "El departamento de seguridad digital del reino, mi señor.", pts: 3, reply: "¿Reino? ¡Digno de respeto!" },
-          { t: "Soy de una empresa. Vendemos cosas.", pts: 1, reply: "¿Cosas? Cuidado, villano." },
-          { t: "Jaja, ¿esto es una broma?", pts: 0, reply: "¡Ofensa! Exijo un duelo." },
+          { t: "Señora, YO soy el encargado. El encargado del encargado, de hecho.", trust: GOOD },
+          { t: "Mi encargado está en la playa con su dinero.", trust: BAD },
+          { t: "Llamamos por un reembolso de su pedido.", trust: MEH },
         ],
       },
       {
-        say: "¿Qué es esa 'internet' de la que hablas?",
+        say: "¿Reembolso? No he pedido nada. Bueno, cuarenta velas aromáticas.",
         options: [
-          { t: "Una red de dragones invisibles que le espían. Nuestra VPN los espanta.", pts: 3, reply: "¡Dragones! Lo sabía." },
-          { t: "Es como una paloma mensajera, pero más rápida.", pts: 1, reply: "Entiendo a medias." },
-          { t: "No tengo tiempo para explicárselo.", pts: 0, reply: "Pues no hay trato." },
+          { t: "Puede haber un error en el sistema.", trust: MEH },
+          { t: "Le cobramos 4.000 por error. Ya he despedido al culpable, señora.", trust: GOOD },
+          { t: "Las velas eran feas, la verdad.", trust: BAD },
         ],
       },
       {
-        say: "¿Cuánto por proteger mi castillo?",
+        say: "Quiero mi dinero ahora mismo. Y una disculpa por escrito.",
         options: [
-          { t: "Cinco monedas de oro al mes y un tributo de bienvenida.", pts: 3, reply: "¡Trato! Mi escudero te enviará el oro." },
-          { t: "Depende del tamaño del castillo.", pts: 1, reply: "Es enorme. Y mi foso, profundo." },
-          { t: "Es gratis. Bueno, casi.", pts: 0, reply: "Nada es gratis, villano." },
+          { t: "¿Por escrito? Si quiere le canto una canción.", trust: BAD },
+          { t: "Se lo devolvemos en unos días hábiles.", trust: MEH },
+          { t: "Por supuesto. Necesito su número de cuenta y, por las molestias, una reseña de cinco estrellas.", trust: GOOD },
         ],
       },
     ],
+    react: {
+      bien1: "Por fin alguien competente.",
+      bien2: "Así se trata a una clienta.",
+      duda1: "I don't know… esto no me lo explicaron en el grupo de madres.",
+      duda2: "Hmm, tu tono no me convence.",
+      mal: "¡Pásame con tu encargado AHORA!",
+      trato: "Apunta. Y que conste que lo hago porque soy muy razonable.",
+      cuelga: "Una estrella. Y te denuncio en Facebook.",
+    },
   },
   {
-    id: "gerardo",
-    customer: "Gerardo el Fantasma",
-    emoji: "👻",
-    product: "Seguro de Vida (para el Más Allá)",
+    id: "herbert",
+    customer: "Herbert, viudo y solitario",
+    emoji: "👴",
+    scam: "La herencia del Príncipe de Nigeria",
     rounds: [
       {
-        say: "Uuuuh... ¿quién llama desde el mundo de los vivos?",
+        say: "¿Sí? Hacía tanto que no sonaba el teléfono que creía que se había roto.",
         options: [
-          { t: "¡Su nueva aseguradora, Gerardo! Hablemos de su futuro eterno.", pts: 3, reply: "Mi futuro... eternamente cubierto." },
-          { t: "Es una encuesta de satisfacción.", pts: 1, reply: "Estoy muerto, no satisfecho." },
-          { t: "Perdón, creía que estaba vivo.", pts: 0, reply: "Pues cuelgo." },
+          { t: "Hola, tengo una propuesta de negocio.", trust: MEH },
+          { t: "¿Está usted solo en casa? Lo pregunto por nada.", trust: BAD },
+          { t: "Saludos, Herbert. Soy {alias}, secretario de Su Alteza el Príncipe. Busca un hombre de confianza y le ha elegido a usted.", trust: GOOD },
         ],
       },
       {
-        say: "Ya estoy muerto. ¿Para qué quiero un seguro de vida?",
+        say: "¿Un príncipe? ¿Y por qué yo?",
         options: [
-          { t: "Por eso es el momento: cubre su después de la vida.", pts: 3, reply: "Qué lógica más retorcida y perfecta." },
-          { t: "Pues entonces uno de muerte.", pts: 1, reply: "Eso ya lo tengo." },
-          { t: "Tiene razón, no sé por qué llamo.", pts: 0, reply: "Yo tampoco lo sé." },
+          { t: "Porque el ordenador real dijo: «Herbert, de Ohio». Es el destino.", trust: GOOD },
+          { t: "Porque los demás ya nos han bloqueado.", trust: BAD },
+          { t: "Lo hemos elegido al azar, pero con cariño.", trust: MEH },
         ],
       },
       {
-        say: "¿Y si me vuelvo a morir?",
+        say: "¿Y qué tengo que hacer?",
         options: [
-          { t: "Cubrimos hasta tres muertes por póliza. La cuarta lleva recargo.", pts: 3, reply: "Eso me tranquiliza." },
-          { t: "Se estudiará caso por caso.", pts: 1, reply: "Burocracia hasta en el más allá." },
-          { t: "No creo que eso sea posible.", pts: 0, reply: "Qué poca imaginación." },
+          { t: "Firmar aquí con sangre. Es broma. ¿O no?", trust: BAD },
+          { t: "Solo prestarle su cuenta para depositar 30 millones. Usted se queda el 20 %. Y una corona de recuerdo.", trust: GOOD },
+          { t: "Enviarnos 500 dólares para los papeles.", trust: MEH },
         ],
       },
     ],
+    react: {
+      bien1: "¡Ay, si Martha viviera para ver esto!",
+      bien2: "Eso suena muy oficial.",
+      duda1: "I don't know… mi sobrino dice que no me fíe de los príncipes.",
+      duda2: "Hmm… ¿y no hay una princesa?",
+      mal: "Joven, soy viejo, no idiota.",
+      trato: "Le doy mi cuenta, joven. Y si el príncipe quiere, que venga a cenar el domingo.",
+      cuelga: "Me voy a ver la tele. Al menos ella no me pide nada.",
+    },
   },
   {
-    id: "rob9",
-    customer: "ROB-9",
-    emoji: "🤖",
-    product: "Antivirus para Humanos",
+    id: "bob",
+    customer: "Bob, el cazaestafadores",
+    emoji: "🕵️",
+    scam: "Soporte técnico de Microsofty (otra vez)",
     rounds: [
       {
-        say: "BEEP. IDENTIFÍQUESE, MATERIA ORGÁNICA.",
+        say: "¡Hola, hola! ¿Me llamáis por mi ordenador? Espera que lo enciendo… tarda 45 minutos.",
         options: [
-          { t: "Soy su asistente de bienestar corporal certificado.", pts: 3, reply: "CERTIFICADO: PALABRA ACEPTADA." },
-          { t: "Soy humano también.", pts: 1, reply: "SOSPECHOSO." },
-          { t: "Error 404. Vuelvo luego.", pts: 0, reply: "ERROR RECIBIDO." },
+          { t: "¿45 minutos? ¿No tiene otro?", trust: MEH },
+          { t: "Sin problema, señor Bob. Mientras tanto le explico la oferta.", trust: GOOD },
+          { t: "Bob, sé que me estás grabando para YouTube.", trust: BAD },
         ],
       },
       {
-        say: "¿QUÉ VIRUS TIENEN LOS HUMANOS?",
+        say: "Ya está. Me sale una pantalla azul que pone «te estoy grabando». ¿Es normal?",
         options: [
-          { t: "Resfriados, lunes y suegras. Nuestro escáner los detecta todos.", pts: 3, reply: "SUEGRAS: AMENAZA CRÍTICA." },
-          { t: "Muchos virus, muy graves.", pts: 1, reply: "DEMASIADO VAGO." },
-          { t: "No sé, yo soy de ventas.", pts: 0, reply: "VENTAS NO ES CIENCIA." },
+          { t: "Bob, cuelgo, que te conozco.", trust: BAD },
+          { t: "Totalmente normal, es el virus. Por eso le llamamos.", trust: GOOD },
+          { t: "Eh… no toque nada.", trust: MEH },
         ],
       },
       {
-        say: "¿PRECIO?",
+        say: "Perfecto. ¿Te doy la tarjeta? Es el 1-2-3… espera, que me suena la tetera.",
         options: [
-          { t: "Solo 0,99 el primer mes. La letra pequeña es un detalle.", pts: 3, reply: "LETRA PEQUEÑA ILEGIBLE. ACEPTO." },
-          { t: "Un precio razonable.", pts: 1, reply: "DEFINA 'RAZONABLE'." },
-          { t: "Es caro, pero vale la pena.", pts: 0, reply: "ANÁLISIS: NEGATIVO." },
+          { t: "Tranquilo, Bob, yo espero. Tengo una cuota que cumplir.", trust: GOOD },
+          { t: "Rápido, que me echa el jefe.", trust: MEH },
+          { t: "¡Dame la tarjeta o maldigo a toda tu familia!", trust: BAD },
         ],
       },
     ],
+    react: {
+      bien1: "Eres muy buen profesional. Te voy a recomendar… ¡a la policía! Es broma.",
+      bien2: "¡Qué paciencia! Me encanta.",
+      duda1: "I don't know… ¿cómo se escribe «Microsofty»? Es para la denuncia. ¡Digo, la reseña!",
+      duda2: "Uy, se me ha cortado… ¿sigues ahí? Qué bien.",
+      mal: "Saluda a la cámara, amigo. Tienes dos millones de visitas.",
+      trato: "Ahí va: cero, cero, cero, cero… Caduca nunca. ¡Trato hecho! (El jefe no lo comprueba.)",
+      cuelga: "Gracias por los cuarenta minutos. Suscríbete al canal.",
+    },
   },
   {
-    id: "yeti",
-    customer: "Yeti Paco",
-    emoji: "🏔️",
-    product: "Calefactores para Iglús",
+    id: "brenda",
+    customer: "Brenda, influencer",
+    emoji: "🤳",
+    scam: "La Lotería Internacional de Influencers",
     rounds: [
       {
-        say: "Brrr... ¿Diga? Estoy congelado.",
+        say: "¿Quién es? Estoy en directo, tengo a 300 personas mirando.",
         options: [
-          { t: "¡Justo lo que necesitábamos oír! Tenemos calor en oferta.", pts: 3, reply: "¡Calor! ¡Quiero calor!" },
-          { t: "¿Tiene frío? Qué casualidad.", pts: 1, reply: "No es casualidad: vivo en un glaciar." },
-          { t: "Perdone la molestia.", pts: 0, reply: "Molestas poco, pero molestas." },
+          { t: "¿300? Mi abuela tiene más seguidores.", trust: BAD },
+          { t: "Hola, la llamo por un premio.", trust: MEH },
+          { t: "¡Brenda! Soy {alias}, de la Lotería Internacional de Influencers. ¡Ha ganado!", trust: GOOD },
         ],
       },
       {
-        say: "¿Funciona con nieve?",
+        say: "¿Ganado? ¿Qué he ganado? ¡Chicos, he ganado algo!",
         options: [
-          { t: "Lo diseñaron pingüinos ingenieros en el Polo Norte.", pts: 3, reply: "Pingüinos... les respeto." },
-          { t: "Funciona con enchufe.", pts: 1, reply: "No tengo enchufes." },
-          { t: "No lo he probado.", pts: 0, reply: "Mal asunto." },
+          { t: "Un millón de dólares y la marca azul de verificada. Para siempre.", trust: GOOD },
+          { t: "Un cupón del 5 % en velas aromáticas.", trust: BAD },
+          { t: "Un premio. Bastante dinero, creo.", trust: MEH },
         ],
       },
       {
-        say: "¿Y si se me derrite la casa?",
+        say: "¡Me encanta! ¿Qué necesitas?",
         options: [
-          { t: "Eso demuestra que funciona. Sin devoluciones.", pts: 3, reply: "Lógica de hielo. Me convence." },
-          { t: "Habría que mirar la garantía.", pts: 1, reply: "Brrr." },
-          { t: "Pues compre otra casa.", pts: 0, reply: "Poca empatía." },
+          { t: "Pagar 99 dólares de tasas.", trust: MEH },
+          { t: "Sus datos bancarios para el ingreso. Léalos en directo, así sus fans son testigos.", trust: GOOD },
+          { t: "Su contraseña de Instagram. Y la de todo lo demás.", trust: BAD },
         ],
       },
     ],
-  },
-  {
-    id: "medusa",
-    customer: "Doña Medusa",
-    emoji: "🐍",
-    product: "Espejos Antirreflejo",
-    rounds: [
-      {
-        say: "Sssí, ¿quién es? Y no me mire, que es peor.",
-        options: [
-          { t: "¡No la miro, se lo prometo! Llamo justo por eso: espejos que no devuelven la mirada.", pts: 3, reply: "Sssugerente." },
-          { t: "Tengo una oferta que le dejará de piedra.", pts: 1, reply: "Eso lo hago yo, querido." },
-          { t: "¿Puede activar la videollamada?", pts: 0, reply: "Usted no aprende, ¿eh?" },
-        ],
-      },
-      {
-        say: "Mi último peluquero acabó de estatua. ¿Y los espejos?",
-        options: [
-          { t: "Irrompibles, y con garantía de que ninguno sale petrificado.", pts: 3, reply: "Por fin un poco de seguridad laboral." },
-          { t: "Son espejos normales, pero más caros.", pts: 1, reply: "Qué sinceridad tan poco comercial." },
-          { t: "Su peluquero no estará en nuestra base de clientes, ¿no?", pts: 0, reply: "Está en mi jardín." },
-        ],
-      },
-      {
-        say: "¿Y si me canso de ellos?",
-        options: [
-          { t: "Los decora usted con sus serpientes. Edición limitada.", pts: 3, reply: "Mis niñas estarán encantadas. Trato." },
-          { t: "Tiene catorce días para devolverlos.", pts: 1, reply: "El mensajero no sobrevivirá." },
-          { t: "Pues los tira, como todo el mundo.", pts: 0, reply: "Sssin alma." },
-        ],
-      },
-    ],
-  },
-  {
-    id: "barbanegra",
-    customer: "Capitán Barbanegra",
-    emoji: "🏴‍☠️",
-    product: "GPS para Tesoros Enterrados",
-    rounds: [
-      {
-        say: "¡Arrr! ¿Quién se atreve a llamar a mi loro?",
-        options: [
-          { t: "Su proveedor oficial de mapas, capitán. Sin la X borrosa.", pts: 3, reply: "¡Arrr! Esa X me trae por la calle de la amargura." },
-          { t: "Un servicio de atención al pirata.", pts: 1, reply: "¿Atención? Yo atiendo a cañonazos." },
-          { t: "Creo que me he equivocado de número.", pts: 0, reply: "¡A la tabla con él!" },
-        ],
-      },
-      {
-        say: "Ya tengo un mapa. Me lo dio un tipo con una pata de palo.",
-        options: [
-          { t: "Ese mapa tiene dos siglos y ninguna actualización. El nuestro avisa de los tiburones.", pts: 3, reply: "Los tiburones me deben un brazo..." },
-          { t: "El nuestro es más bonito.", pts: 1, reply: "La belleza no da doblones." },
-          { t: "¿Seguro que no es un mapa del metro?", pts: 0, reply: "¡Arrr, insolente!" },
-        ],
-      },
-      {
-        say: "¿Cuánto me cuesta?",
-        options: [
-          { t: "Un 10 % del tesoro que encuentre. Si no encuentra nada, no paga... casi.", pts: 3, reply: "¡Trato hecho, grumete!" },
-          { t: "Tenemos planes desde 29,99 al mes.", pts: 1, reply: "¿Mes? Yo cuento en mareas." },
-          { t: "Solo aceptamos tarjeta, nada de oro.", pts: 0, reply: "¡Pues hundan su barco!" },
-        ],
-      },
-    ],
-  },
-  {
-    id: "manolo",
-    customer: "Manolo el Zombi",
-    emoji: "🧟",
-    product: "Plan de Dieta Sin Cerebros",
-    rounds: [
-      {
-        say: "Ceeerebrooos... digo, ¿diga?",
-        options: [
-          { t: "¡Manolo! Le llamo para ayudarle a dejar ese mal hábito.", pts: 3, reply: "Llevo siglos intentándolo, uuugh." },
-          { t: "Le ofrezco un plan de alimentación.", pts: 1, reply: "¿Lleva... cerebros?" },
-          { t: "Uy, qué voz más rara tiene usted.", pts: 0, reply: "Se me cayó la mandíbula. Literal." },
-        ],
-      },
-      {
-        say: "¿Y qué voy a comer, entonces?",
-        options: [
-          { t: "Coliflor. Tiene la misma forma y cero remordimientos.", pts: 3, reply: "Coliflor... qué idea más brillante." },
-          { t: "Ensaladas variadas.", pts: 1, reply: "Las ensaladas no corren. Qué aburrido." },
-          { t: "Lo que quiera, menos a mí.", pts: 0, reply: "Ya veremos." },
-        ],
-      },
-      {
-        say: "¿Y si me cuesta seguirlo?",
-        options: [
-          { t: "Incluye un coach motivacional que, por contrato, ya no tiene cerebro que perder.", pts: 3, reply: "Me apunto, uuugh." },
-          { t: "Puede pedir ayuda a su médico.", pts: 1, reply: "Me lo comí en 1987." },
-          { t: "Pues no se apunte.", pts: 0, reply: "Uuugh. Grosero." },
-        ],
-      },
-    ],
-  },
-  {
-    id: "bruja",
-    customer: "La Abuela Bruja",
-    emoji: "🧙‍♀️",
-    product: "Escobas Eléctricas",
-    rounds: [
-      {
-        say: "¿Quién es? Tengo el caldero al fuego, sé breve.",
-        options: [
-          { t: "Su asesor de movilidad sostenible, señora. Escobas con batería de litio.", pts: 3, reply: "¿Batería? Como el móvil de mi nieta." },
-          { t: "Alguien que la quiere ayudar.", pts: 1, reply: "Eso decía Hansel." },
-          { t: "Huele a quemado desde aquí.", pts: 0, reply: "Es la cena. Y sobra sitio." },
-        ],
-      },
-      {
-        say: "Mi escoba de paja vuela de maravilla.",
-        options: [
-          { t: "Y ahora con asiento calefactable y GPS para no perderse en la niebla.", pts: 3, reply: "La niebla me tiene harta, sí." },
-          { t: "La nuestra vuela más rápido.", pts: 1, reply: "¿Y para qué tanta prisa?" },
-          { t: "Pues siga con ella, a mí qué.", pts: 0, reply: "Te convertiría en sapo si tuviera tiempo." },
-        ],
-      },
-      {
-        say: "¿Y cómo se carga?",
-        options: [
-          { t: "Con un rayo de luna llena o con un enchufe normal, lo que pille más cerca.", pts: 3, reply: "¡Moderna y tradicional! Me la llevo." },
-          { t: "Viene con un cargador.", pts: 1, reply: "Otro cable más en la cueva." },
-          { t: "No lo sé, nunca he volado.", pts: 0, reply: "Se nota." },
-        ],
-      },
-    ],
+    react: {
+      bien1: "¡OMG! ¡Chicos, dadle like!",
+      bien2: "Esto es, literal, lo mejor que me ha pasado.",
+      duda1: "I don't know… el chat dice que es una estafa.",
+      duda2: "Hmm, ¿esto es una colaboración pagada?",
+      mal: "Bloqueado y reportado. Chicos, es un hater.",
+      trato: "¡Chat, apuntad conmigo! El número de cuenta es…",
+      cuelga: "Me voy a hacer un directo llorando por esto.",
+    },
   },
 ];
 
-export type LineKind = "cliente" | "jugador" | "respuesta";
-
-/** Nombre del audio por convención. `opt` es 1, 2 o 3 (no hace falta para "cliente"). */
-export function audioFile(callId: string, round: number, kind: LineKind, opt?: number): string {
-  return kind === "cliente" ? `${callId}_r${round}_cliente.mp3` : `${callId}_r${round}_op${opt}_${kind}.mp3`;
+/** Reacción del cliente según cuánto ha cambiado la confianza. */
+export function reactionFor(delta: number): Reaction {
+  const two = Math.random() < 0.5 ? "1" : "2";
+  if (delta >= 20) return `bien${two}` as Reaction;
+  if (delta > 0) return `duda${two}` as Reaction;
+  return "mal";
 }
 
+/** Archivo de audio por convención: <id>_<clave>.mp3 (clave: r1_cliente, r1_op2_jugador, bien1…). */
+export const audioFile = (callId: string, key: string) => `${callId}_${key}.mp3`;
+
 /** Lo que dice el cliente si se acaba el tiempo sin responder. */
-export const SILENCE_REPLY = { text: "…¿Hola? ¿Sigue usted ahí?", audio: "general_silencio.mp3" };
+export const SILENCE_REPLY = { text: "…¿Hola? ¿Sigue usted ahí?", audio: "general_silencio.mp3", trust: -15 };
 
 export function pickCall(last?: string): CallDef {
   const pool = CALLS.filter((c) => c.id !== last);

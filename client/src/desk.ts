@@ -1,4 +1,4 @@
-import { audioFile, SILENCE_REPLY, type CallDef } from "./calls";
+import { audioFile, reactionFor, SILENCE_REPLY, TRUST_DEAL, TRUST_START, TRUST_WIN, type CallDef } from "./calls";
 import { CAST } from "./config";
 import { audioCtx, sfx } from "./audio";
 import { faceFile } from "./characters";
@@ -22,21 +22,24 @@ export class DeskUI {
   private meterTimer = 0;
   private clockTimer = 0;
   private audioEl: HTMLAudioElement | null = null;
+  current: CallDef | null = null; // llamada en curso (la usa también la prueba de humo)
+  roundIdx = 0;
 
   /** Devuelve los puntos (0-9) o null si el jugador se levanta a mitad de llamada. */
   run(call: CallDef, castIdx: number): Promise<number | null> {
     this.active = true;
     const root = $("desk");
     root.classList.remove("hidden");
-    $("c-product").textContent = call.product;
+    $("c-product").textContent = call.scam;
     $("c-emoji").textContent = call.emoji;
     $("c-name").textContent = call.customer;
     $("c-say").textContent = "Marcando…";
     $("c-reply").classList.add("hidden");
     $("c-result").classList.add("hidden");
     $("c-options").innerHTML = "";
-    $("d-avatar").textContent = CAST[castIdx % CAST.length].name.slice(0, 1);
     const who = CAST[castIdx % CAST.length];
+    const alias = (text: string) => text.replaceAll("{alias}", who.alias);
+    $("d-avatar").textContent = who.name.slice(0, 1);
     $("d-avatar").style.background = `url("faces/${faceFile(who.name)}") center / cover no-repeat, #${who.shirt.toString(16).padStart(6, "0")}`;
     const img = new Image(); // con foto, se quita la inicial
     img.onload = () => ($("d-avatar").textContent = "");
@@ -53,9 +56,17 @@ export class DeskUI {
     $("d-cam").onclick = () => void this.toggleCam();
     $("d-mic").onclick = () => void this.toggleMic();
 
+    this.current = call;
+    this.roundIdx = 0;
+    let trust = TRUST_START;
+    const showTrust = () => {
+      const bar = $("c-trust");
+      bar.style.width = `${Math.max(0, Math.min(100, (trust / TRUST_WIN) * 100))}%`;
+      bar.className = trust >= TRUST_DEAL ? "hi" : trust >= 40 ? "mid" : "lo";
+    };
+    showTrust();
+
     return new Promise<number | null>((resolve) => {
-      let total = 0;
-      let round = 0;
       let locked = false;
       let timer = 0;
       let startAt = 0;
@@ -67,29 +78,38 @@ export class DeskUI {
         clearInterval(timer);
         this.stopAudio();
         this.talk(false);
+        this.current = null;
         this.close();
         resolve(v);
       };
 
-      const showResult = () => {
+      // trato cerrado o cuelga: frase final del cliente y resultado
+      const finish = (deal: boolean) => {
         clearInterval(timer);
         this.talk(false);
         $("c-options").innerHTML = "";
         $("c-timer").style.width = "0%";
-        const msg =
-          total >= 8 ? "¡Venta cerrada! Tu supervisor te regala una galleta caducada." :
-          total >= 5 ? "Venta a medias. Tu supervisor te mira con indiferencia profesional." :
-          total >= 2 ? "Casi nada. Te descuentan el café de esta semana." :
-          "Desastre. El cliente cuelga y el sistema te marca en rojo.";
+        const key = deal ? "trato" : "cuelga";
+        const rep = $("c-reply");
+        rep.classList.remove("hidden");
+        rep.textContent = call.react[key];
+        void this.playSeq([audioFile(call.id, key)]);
+        const pts = deal ? (trust >= TRUST_WIN ? 9 : 6) : trust >= 40 ? 1 : 0;
+        const msg = deal
+          ? trust >= TRUST_WIN
+            ? "¡Trato cerrado a lo grande! El jefe te deja comer sentado."
+            : "Trato cerrado. Tu supervisor te regala una galleta caducada."
+          : pts > 0
+            ? "Casi pica. Te descuentan el café de esta semana."
+            : "Te ha colgado. El sistema te marca en rojo y tu silla pierde una rueda.";
         const r = $("c-result");
         r.classList.remove("hidden");
-        r.innerHTML = `<b>+${total} puntos de cuota</b><br>${msg}<br><button id="c-hang">Colgar (Enter)</button>`;
-        total >= 5 ? sfx.done() : sfx.bad();
-        $("c-hang").onclick = () => end(total);
+        r.innerHTML = `<b>${deal ? "🤝 TRATO CERRADO" : "📵 CUELGA"} · +${pts} puntos de cuota</b><br>${msg}<br><button id="c-hang">Colgar (Enter)</button>`;
+        deal ? sfx.done() : sfx.bad();
+        $("c-hang").onclick = () => end(pts);
         locked = false;
         this.onKey = (e) => {
-          if (e.key === "Enter" || e.key === " ") end(total);
-          if (e.key === "Escape") end(total);
+          if (e.key === "Enter" || e.key === " " || e.key === "Escape") end(pts);
         };
       };
 
@@ -97,45 +117,46 @@ export class DeskUI {
         if (locked) return;
         locked = true;
         clearInterval(timer);
-        const rd = call.rounds[round];
-        const opt = k === null ? null : rd.options[k];
-        const pts = opt ? opt.pts : 0;
-        total += pts;
-        const reply = opt ? opt.reply : SILENCE_REPLY.text;
+        const n = this.roundIdx + 1;
+        const opt = k === null ? null : call.rounds[this.roundIdx].options[k];
+        const delta = opt ? opt.trust : SILENCE_REPLY.trust;
+        trust = Math.max(0, trust + delta);
+        showTrust();
+        const react = opt ? reactionFor(delta) : null;
         const rep = $("c-reply");
         rep.classList.remove("hidden");
-        rep.textContent = reply;
-        pts === 3 ? sfx.good() : pts === 1 ? sfx.ok() : sfx.bad();
-        // primero lo que dice el jugador, después la reacción del cliente
-        const said = this.playSeq(
-          opt && k !== null
-            ? [opt.audio ?? audioFile(call.id, round + 1, "jugador", k + 1), opt.replyAudio ?? audioFile(call.id, round + 1, "respuesta", k + 1)]
-            : [SILENCE_REPLY.audio],
-        );
+        rep.textContent = react ? call.react[react] : SILENCE_REPLY.text;
+        delta >= 20 ? sfx.good() : delta > 0 ? sfx.ok() : sfx.bad();
+        // primero lo que dice el empleado, después la reacción del cliente
+        const said = this.playSeq(react && k !== null ? [audioFile(call.id, `r${n}_op${k + 1}_jugador`), audioFile(call.id, react)] : [SILENCE_REPLY.audio]);
         [...$("c-options").children].forEach((b, i) => {
           (b as HTMLButtonElement).disabled = true;
-          if (i === k) b.classList.add(pts === 3 ? "good" : pts === 1 ? "meh" : "bad");
+          if (i === k) b.classList.add(delta >= 20 ? "good" : delta > 0 ? "meh" : "bad");
         });
         void Promise.all([said, new Promise((r) => window.setTimeout(r, 1700))]).then(() => {
           if (finished) return;
-          round++;
-          if (round >= call.rounds.length) showResult();
+          this.roundIdx++;
+          if (trust >= TRUST_WIN) finish(true);
+          else if (trust <= 0) finish(false);
+          else if (this.roundIdx >= call.rounds.length) finish(trust >= TRUST_DEAL);
           else showRound();
         });
       };
 
       const showRound = () => {
         locked = false;
-        const rd = call.rounds[round];
+        const n = this.roundIdx + 1;
+        const rd = call.rounds[this.roundIdx];
         $("c-reply").classList.add("hidden");
-        $("c-say").textContent = `“${rd.say}”`;
-        void this.playSeq([rd.sayAudio ?? audioFile(call.id, round + 1, "cliente")]);
+        $("c-say").textContent = `“${alias(rd.say)}”`;
+        void this.playSeq([audioFile(call.id, `r${n}_cliente`)]);
         this.talk(true);
         const opts = $("c-options");
         opts.innerHTML = "";
         rd.options.forEach((o, i) => {
           const b = document.createElement("button");
-          b.innerHTML = `<kbd>${i + 1}</kbd> ${o.t}`;
+          b.innerHTML = `<kbd>${i + 1}</kbd> `;
+          b.append(alias(o.t));
           b.onclick = () => pick(i);
           opts.appendChild(b);
         });
@@ -147,9 +168,8 @@ export class DeskUI {
           if (f <= 0) pick(null);
         }, 80);
         this.onKey = (e) => {
-          if (e.key >= "1" && e.key <= "3") {
-            pick(Number(e.key) - 1);
-          } else if (e.key === "Escape") end(null);
+          if (e.key >= "1" && e.key <= "3") pick(Number(e.key) - 1);
+          else if (e.key === "Escape") end(null);
         };
       };
 

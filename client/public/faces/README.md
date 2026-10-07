@@ -4,12 +4,13 @@ Pon aquí una imagen por personaje, en `.png`, con el nombre del personaje en mi
 
 | Personaje | Archivo |
 |---|---|
-| Chidi | `chidi.png` |
-| Farhan | `farhan.png` |
-| Priya | `priya.png` |
-| Marek | `marek.png` |
-| Lucía | `lucia.png` |
-| Wei | `wei.png` |
+| Mohit (alias Steven Myers) | `mohit.png` |
+| Omanga (alias Jimmy) | `omanga.png` |
+| Harpreet (alias Jennifer) | `harpreet.png` |
+| Rahim (alias Kevin) | `rahim.png` |
+| Thura (alias Brad) | `thura.png` |
+| Dmitri (alias Mike) | `dmitri.png` |
+| Lucía (alias Jessica) | `lucia.png` |
 | Don Bonifacio (el jefe) | `don-bonifacio.png` |
 
 Consejos: imagen cuadrada (por ejemplo 512×512), solo la cara, recortada, y con el fondo transparente si puedes.

@@ -74,6 +74,11 @@
     .muted { color: #6b7a8e; font-size: 12px; }
     .timer { flex: 1; height: 8px; background: #dde3ec; border-radius: 5px; overflow: hidden; margin-left: 10px; }
     #c-timer { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #e04b4b, #f2a43a, #3ecf7a); background-size: 300% 100%; background-position: 100% 0; }
+    .trust { display: flex; align-items: center; gap: 10px; margin: 6px 14px 0; font-size: 12px; font-weight: 700; color: #4a596d; }
+    .trust .tbar { flex: 1; height: 14px; background: #dde3ec; border-radius: 7px; overflow: hidden; }
+    #c-trust { display: block; height: 100%; width: 25%; transition: width 0.5s, background 0.5s; background: var(--bad); }
+    #c-trust.mid { background: var(--meh); }
+    #c-trust.hi { background: var(--good); }
     .bubble { margin: 8px 14px 0; padding: 10px 14px; border-radius: 12px; background: #e9eef5; font-size: 16px; }
     .bubble.me { background: #fff1d6; }
     .options { display: flex; flex-direction: column; gap: 7px; margin: 12px 14px 0; }
@@ -120,12 +125,13 @@
       <div class="topbar"><span>🖥️ Escritorio · <span id="d-time"></span></span><span id="d-esc">Esc: levantarse · 1 / 2 / 3: responder</span></div>
       <div class="work">
         <section class="win callwin">
-          <header>📞 Llamada saliente · <span id="c-product"></span></header>
+          <header>📞 Llamada saliente · Guion: <span id="c-product"></span></header>
           <div class="client">
             <div class="emoji" id="c-emoji"></div>
             <div><b id="c-name"></b><div class="muted">Cliente (ficticio)</div></div>
             <div class="timer"><i id="c-timer"></i></div>
           </div>
+          <div class="trust"><span>Confianza del cliente</span><div class="tbar"><i id="c-trust"></i></div><span>🤝</span></div>
           <div class="bubble" id="c-say"></div>
           <div class="bubble me hidden" id="c-reply"></div>
           <div class="options" id="c-options"></div>
@@ -155,8 +161,8 @@
   <div id="menu">
     <div class="panel">
       <h1 id="title">CALL CENTER</h1>
-      <div class="tag-line">Cooperativo online de humor negro en una centralita de ventas. Hasta <span id="max">4</span> jugadores.</div>
-      <div><b>Elige empleado</b></div>
+      <div class="tag-line">Cooperativo online de humor negro en una centralita de estafas. Hasta <span id="max">4</span> jugadores.</div>
+      <div><b>Elige estafador</b></div>
       <div id="cast"></div>
       <div class="row">
         <input id="name" maxlength="14" placeholder="Tu nombre" autocomplete="off" />
@@ -166,7 +172,7 @@
         <button class="btn alt" id="btn-solo">Jugar solo</button>
       </div>
       <div class="keys"><kbd>WASD</kbd> mover · arrastra el ratón para girar la cámara · <kbd>E</kbd> en un puesto para atender llamadas · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> para responder</div>
-      <div class="legal">Sátira de humor negro. Empresas, clientes y personajes son completamente ficticios. Las “ventas” del juego son absurdas y no enseñan ninguna técnica real.</div>
+      <div class="legal">Parodia de humor negro de los call center que estafan. Empresas, víctimas y personajes son ficticios. Las estafas del juego son absurdas y no enseñan ninguna técnica real.</div>
     </div>
   </div>
 

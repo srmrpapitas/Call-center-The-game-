@@ -32,7 +32,7 @@ CAST.forEach((c, i) => {
   const el = document.createElement("button");
   el.className = "card" + (i === skin ? " sel" : "");
   const hex = (n: number) => "#" + n.toString(16).padStart(6, "0");
-  el.innerHTML = `<span class="swatch" style="--skin:${hex(c.skin)};--shirt:${hex(c.shirt)}"></span><b>${c.name}</b><small>${c.role}</small><em>${c.quirk}</em>`;
+  el.innerHTML = `<span class="swatch" style="--skin:${hex(c.skin)};--shirt:${hex(c.shirt)}"></span><b>${c.name}</b><small>alias «${c.alias}» · ${c.role}</small><em>${c.quirk}</em>`;
   el.onclick = () => {
     skin = i;
     [...cards.children].forEach((x, j) => x.classList.toggle("sel", j === i));

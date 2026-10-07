@@ -45,9 +45,17 @@ Funciona con los planes gratuitos de Cloudflare (Workers + Durable Objects), Git
 
 En local: `npm install && npm run icons && npm run tauri build` (necesita Rust).
 
-## Tus audios
+## Cómo funcionan las llamadas
 
-Mira `client/public/audio/calls/README.md`. Cada línea de `client/src/calls.ts` admite un archivo de audio opcional.
+Eliges estafador (cada uno con su alias: Mohit es «Steven Myers», Omanga es «Jimmy»…), te sientas y llamas.
+Cada respuesta sube o baja la **barra de confianza** del cliente: si llega arriba cierras el trato y te da
+sus «datos bancarios»; si cae a cero, te cuelga. Todo es ficticio y absurdo.
+
+## Tus audios y caras
+
+- `npm run guion` genera `GUION-AUDIOS.md` con todas las frases y el nombre de archivo de cada audio.
+  Los audios van en `client/public/audio/calls/`.
+- Las caras de los personajes van en `client/public/faces/` (mira el README de esa carpeta).
 
 ## Pendiente (siguientes fases)
 
