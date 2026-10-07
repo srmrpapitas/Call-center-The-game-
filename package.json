@@ -7,7 +7,8 @@
     "dev:server": "npm --prefix worker run dev",
     "deploy:server": "npm --prefix client run build && npm --prefix worker run deploy",
     "icons": "tauri icon src-tauri/app-icon.png",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "guion": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/guion-audios.ts"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0"
