@@ -25,7 +25,7 @@ function limb(w: number, h: number, d: number, m: THREE.Material, x: number, y: 
 // Caras opcionales: public/faces/<nombre>.png (p. ej. lucia.png). Si no existe, se dejan los ojos.
 const faceLoader = new THREE.TextureLoader();
 export const faceFile = (name: string) =>
-  name.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + ".png";
+  name.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + ".png";
 
 export function buildAvatar(look: number | CastDef): Avatar {
   const d = typeof look === "number" ? CAST[((look % CAST.length) + CAST.length) % CAST.length] : look;

@@ -1,6 +1,7 @@
-import type { CallDef } from "./calls";
+import { audioFile, SILENCE_REPLY, type CallDef } from "./calls";
 import { CAST } from "./config";
 import { audioCtx, sfx } from "./audio";
+import { faceFile } from "./characters";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const ROUND_MS = 10000;
@@ -9,6 +10,12 @@ const ROUND_MS = 10000;
 // La webcam y el micrófono solo se activan si el jugador pulsa el botón.
 export class DeskUI {
   active = false;
+  /** Avisa de cuándo el jugador está hablando por teléfono (para mover la cabeza del avatar). */
+  onTalk: (talking: boolean) => void = () => {};
+  private talk(on: boolean) {
+    $("d-avatar").classList.toggle("talking", on);
+    this.onTalk(on);
+  }
   private onKey: ((e: KeyboardEvent) => void) | null = null;
   private stream: MediaStream | null = null;
   private micStream: MediaStream | null = null;
@@ -29,7 +36,11 @@ export class DeskUI {
     $("c-result").classList.add("hidden");
     $("c-options").innerHTML = "";
     $("d-avatar").textContent = CAST[castIdx % CAST.length].name.slice(0, 1);
-    $("d-avatar").style.background = "#" + CAST[castIdx % CAST.length].shirt.toString(16).padStart(6, "0");
+    const who = CAST[castIdx % CAST.length];
+    $("d-avatar").style.background = `url("faces/${faceFile(who.name)}") center / cover no-repeat, #${who.shirt.toString(16).padStart(6, "0")}`;
+    const img = new Image(); // con foto, se quita la inicial
+    img.onload = () => ($("d-avatar").textContent = "");
+    img.src = `faces/${faceFile(who.name)}`;
     $("d-esc").classList.remove("hidden");
 
     const tick = () => {
@@ -55,12 +66,14 @@ export class DeskUI {
         finished = true;
         clearInterval(timer);
         this.stopAudio();
+        this.talk(false);
         this.close();
         resolve(v);
       };
 
       const showResult = () => {
         clearInterval(timer);
+        this.talk(false);
         $("c-options").innerHTML = "";
         $("c-timer").style.width = "0%";
         const msg =
@@ -88,21 +101,27 @@ export class DeskUI {
         const opt = k === null ? null : rd.options[k];
         const pts = opt ? opt.pts : 0;
         total += pts;
-        const reply = opt ? opt.reply : "…¿Hola? ¿Sigue usted ahí?";
+        const reply = opt ? opt.reply : SILENCE_REPLY.text;
         const rep = $("c-reply");
         rep.classList.remove("hidden");
         rep.textContent = reply;
         pts === 3 ? sfx.good() : pts === 1 ? sfx.ok() : sfx.bad();
-        this.play(opt?.replyAudio);
+        // primero lo que dice el jugador, después la reacción del cliente
+        const said = this.playSeq(
+          opt && k !== null
+            ? [opt.audio ?? audioFile(call.id, round + 1, "jugador", k + 1), opt.replyAudio ?? audioFile(call.id, round + 1, "respuesta", k + 1)]
+            : [SILENCE_REPLY.audio],
+        );
         [...$("c-options").children].forEach((b, i) => {
           (b as HTMLButtonElement).disabled = true;
           if (i === k) b.classList.add(pts === 3 ? "good" : pts === 1 ? "meh" : "bad");
         });
-        window.setTimeout(() => {
+        void Promise.all([said, new Promise((r) => window.setTimeout(r, 1700))]).then(() => {
+          if (finished) return;
           round++;
           if (round >= call.rounds.length) showResult();
           else showRound();
-        }, 1700);
+        });
       };
 
       const showRound = () => {
@@ -110,16 +129,14 @@ export class DeskUI {
         const rd = call.rounds[round];
         $("c-reply").classList.add("hidden");
         $("c-say").textContent = `“${rd.say}”`;
-        this.play(rd.sayAudio);
+        void this.playSeq([rd.sayAudio ?? audioFile(call.id, round + 1, "cliente")]);
+        this.talk(true);
         const opts = $("c-options");
         opts.innerHTML = "";
         rd.options.forEach((o, i) => {
           const b = document.createElement("button");
           b.innerHTML = `<kbd>${i + 1}</kbd> ${o.t}`;
-          b.onclick = () => {
-            this.play(o.audio);
-            pick(i);
-          };
+          b.onclick = () => pick(i);
           opts.appendChild(b);
         });
         startAt = performance.now();
@@ -131,9 +148,7 @@ export class DeskUI {
         }, 80);
         this.onKey = (e) => {
           if (e.key >= "1" && e.key <= "3") {
-            const i = Number(e.key) - 1;
-            this.play(rd.options[i].audio);
-            pick(i);
+            pick(Number(e.key) - 1);
           } else if (e.key === "Escape") end(null);
         };
       };
@@ -155,11 +170,18 @@ export class DeskUI {
     return true;
   }
 
-  private play(url?: string) {
+  /** Reproduce los audios en orden; termina al acabar el último. Si falta un archivo, se lo salta. */
+  private async playSeq(urls: string[]) {
     this.stopAudio();
-    if (!url) return;
-    this.audioEl = new Audio(`audio/calls/${url}`);
-    void this.audioEl.play().catch(() => {});
+    for (const url of urls) {
+      const el = new Audio(`audio/calls/${url}`);
+      this.audioEl = el;
+      await new Promise<void>((resolve) => {
+        el.onended = el.onerror = el.onpause = () => resolve();
+        el.play().catch(() => resolve());
+      });
+      if (this.audioEl !== el) return; // la cortó otro audio o se colgó la llamada
+    }
   }
 
   private stopAudio() {
