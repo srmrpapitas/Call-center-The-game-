@@ -47,7 +47,17 @@
     .quota .bar { height: 10px; background: #ffffff1f; border-radius: 6px; overflow: hidden; margin-top: 5px; }
     #h-bar { height: 100%; width: 0; background: var(--accent); transition: width 0.4s; }
     #h-bar.done { background: var(--good); }
-    #prompt { position: fixed; bottom: 12%; left: 50%; transform: translateX(-50%); background: #11161de6; border: 2px solid var(--accent); border-radius: 12px; padding: 10px 18px; font-weight: 700; }
+    #prompt { position: fixed; bottom: 12%; left: 50%; transform: translateX(-50%); background: #11161de6; border: 2px solid var(--accent); border-radius: 12px; padding: 10px 18px; font-weight: 700; cursor: pointer; z-index: 15; }
+    /* controles táctiles: joystick a la izquierda; arrastrar en el resto de la pantalla mueve la cámara */
+    #stick { position: fixed; left: 24px; bottom: 24px; width: 130px; height: 130px; border-radius: 50%; background: #ffffff1a; border: 2px solid #ffffff40; touch-action: none; z-index: 12; }
+    #stick i { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; background: #ffffff66; }
+    #run-btn { position: fixed; right: 24px; bottom: 40px; width: 70px; height: 70px; border-radius: 50%; border: 2px solid #ffffff40; background: #ffffff1a; color: #fff; font-weight: 700; touch-action: none; z-index: 12; }
+    #run-btn.on { background: var(--accent); color: #231704; }
+    body:not(.touch) #stick, body:not(.touch) #run-btn { display: none; }
+    body.touch #help { display: none; }
+    body.touch #prompt { bottom: 190px; }
+    #d-esc { cursor: pointer; }
+    body.touch #d-esc { background: var(--bad); color: #fff; border-radius: 6px; padding: 2px 10px; font-weight: 700; }
     #toast { position: fixed; top: 70px; left: 50%; transform: translateX(-50%); background: #11161de6; border: 1px solid #ffffff2a; border-radius: 10px; padding: 9px 16px; z-index: 30; }
     #boss-alert { position: fixed; top: 120px; left: 50%; transform: translateX(-50%); background: #b02a30f0; border: 2px solid #ffd27a; border-radius: 12px; padding: 10px 18px; font-weight: 800; z-index: 31; animation: pulse 0.6s ease-in-out infinite alternate; }
     @keyframes pulse { from { transform: translateX(-50%) scale(1); } to { transform: translateX(-50%) scale(1.06); } }
@@ -128,7 +138,9 @@
     <div class="chip" id="h-players">👥 1</div>
     <div class="chip" id="h-room">Solo</div>
   </div>
-  <div id="prompt" class="hidden"><kbd>E</kbd> Sentarte y atender una llamada</div>
+  <div id="prompt" class="hidden"><kbd>E</kbd> Sentarte y hacer una llamada</div>
+  <div id="stick" class="hidden"><i></i></div>
+  <button id="run-btn" class="hidden">Correr</button>
   <div id="toast" class="hidden"></div>
   <div id="boss-alert" class="hidden"></div>
   <div id="help">WASD mover · Mayús correr · Arrastrar ratón: cámara · Rueda: zoom · E: puesto de trabajo</div>

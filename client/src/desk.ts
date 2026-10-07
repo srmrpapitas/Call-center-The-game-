@@ -72,6 +72,9 @@ export class DeskUI {
     };
     img.src = url;
     $("d-esc").classList.remove("hidden");
+    // en el móvil no hay tecla Esc: tocar el aviso hace lo mismo
+    $("d-esc").onclick = () => this.onKey?.(new KeyboardEvent("keydown", { key: "Escape" }));
+    if (document.body.classList.contains("touch")) $("d-esc").textContent = "✕ Colgar y levantarse";
 
     const tick = () => {
       const d = new Date();

@@ -42,6 +42,8 @@ export class Game {
   private online = false;
   private team = { score: 0, target: QUOTA_PER_PLAYER, phase: "shift" as "shift" | "over", endAt: 0, win: false };
   private keys = new Set<string>();
+  private stick = { x: 0, y: 0 }; // joystick táctil (-1..1)
+  private run = false; // botón táctil de correr
   private yaw = 0;
   private pitch = 0.5;
   private dist = 7.5;
@@ -99,6 +101,8 @@ export class Game {
       if (k === "e" && this.running) this.trySit();
     });
     window.addEventListener("keyup", (e) => this.keys.delete(e.key.toLowerCase()));
+    $("prompt").addEventListener("click", () => this.running && this.trySit());
+    this.bindTouch();
     window.addEventListener("blur", () => this.keys.clear());
     let drag = false;
     this.canvas.addEventListener("mousedown", () => (drag = true));
@@ -117,7 +121,69 @@ export class Game {
     );
   }
 
+  // Móvil y tableta: joystick para andar, arrastrar el dedo para girar la cámara, botón de correr.
+  private bindTouch() {
+    const touch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
+    if (!touch) return;
+    document.body.classList.add("touch");
+    const stick = $("stick");
+    const knob = stick.querySelector("i") as HTMLElement;
+    let stickId: number | null = null;
+    const moveStick = (x: number, y: number) => {
+      const r = stick.getBoundingClientRect();
+      let dx = (x - (r.left + r.width / 2)) / (r.width / 2);
+      let dy = (y - (r.top + r.height / 2)) / (r.height / 2);
+      const len = Math.hypot(dx, dy);
+      if (len > 1) {
+        dx /= len;
+        dy /= len;
+      }
+      this.stick = { x: dx, y: dy };
+      knob.style.transform = `translate(${dx * 40}px, ${dy * 40}px)`;
+    };
+    const resetStick = () => {
+      stickId = null;
+      this.stick = { x: 0, y: 0 };
+      knob.style.transform = "";
+    };
+    stick.addEventListener("pointerdown", (e) => {
+      stickId = e.pointerId;
+      stick.setPointerCapture(e.pointerId);
+      moveStick(e.clientX, e.clientY);
+    });
+    stick.addEventListener("pointermove", (e) => e.pointerId === stickId && moveStick(e.clientX, e.clientY));
+    stick.addEventListener("pointerup", resetStick);
+    stick.addEventListener("pointercancel", resetStick);
+
+    const runBtn = $("run-btn");
+    runBtn.addEventListener("pointerdown", () => {
+      this.run = !this.run;
+      runBtn.classList.toggle("on", this.run);
+    });
+
+    // cámara: arrastrar con un dedo fuera del joystick
+    const last = new Map<number, { x: number; y: number }>();
+    this.canvas.addEventListener("touchstart", (e) => {
+      for (const t of e.changedTouches) last.set(t.identifier, { x: t.clientX, y: t.clientY });
+    }, { passive: true });
+    this.canvas.addEventListener("touchmove", (e) => {
+      for (const t of e.changedTouches) {
+        const p = last.get(t.identifier);
+        if (!p || this.seated) continue;
+        this.yaw -= (t.clientX - p.x) * 0.008;
+        this.pitch = Math.max(0.15, Math.min(1.2, this.pitch + (t.clientY - p.y) * 0.006));
+        last.set(t.identifier, { x: t.clientX, y: t.clientY });
+      }
+    }, { passive: true });
+    const end = (e: TouchEvent) => {
+      for (const t of e.changedTouches) last.delete(t.identifier);
+    };
+    this.canvas.addEventListener("touchend", end);
+    this.canvas.addEventListener("touchcancel", end);
+  }
+
   async start(o: StartOpts): Promise<{ online: boolean }> {
+    (document.activeElement as HTMLElement | null)?.blur(); // que las teclas no se queden en el campo del nombre
     audioCtx(); // se crea tras un gesto del usuario
     const av = buildAvatar(o.skin);
     this.scene.add(av.group);
@@ -149,6 +215,8 @@ export class Game {
     this.running = true;
     this.clock.start();
     $("hud").classList.remove("hidden");
+    $("stick").classList.remove("hidden");
+    $("run-btn").classList.remove("hidden");
     this.updatePlayers();
     return { online: this.online };
   }
@@ -290,9 +358,9 @@ export class Game {
     me.moving = false;
     if (!this.seated) {
       const k = this.keys;
-      const fwd = (k.has("w") || k.has("arrowup") ? 1 : 0) - (k.has("s") || k.has("arrowdown") ? 1 : 0);
-      const right = (k.has("d") || k.has("arrowright") ? 1 : 0) - (k.has("a") || k.has("arrowleft") ? 1 : 0);
-      if (fwd || right) {
+      const fwd = (k.has("w") || k.has("arrowup") ? 1 : 0) - (k.has("s") || k.has("arrowdown") ? 1 : 0) - this.stick.y;
+      const right = (k.has("d") || k.has("arrowright") ? 1 : 0) - (k.has("a") || k.has("arrowleft") ? 1 : 0) + this.stick.x;
+      if (Math.hypot(fwd, right) > 0.15) {
         const fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw);
         const rx = Math.cos(this.yaw), rz = -Math.sin(this.yaw);
         let mx = fx * fwd + rx * right;
@@ -300,7 +368,8 @@ export class Game {
         const len = Math.hypot(mx, mz) || 1;
         mx /= len;
         mz /= len;
-        const speed = k.has("shift") ? 7.5 : 5;
+        const push = Math.min(1, Math.hypot(fwd, right)); // el joystick a medias anda más despacio
+        const speed = (k.has("shift") || this.run ? 7.5 : 5) * push;
         me.pos.x += mx * speed * dt;
         me.pos.z += mz * speed * dt;
         resolveCollisions(me.pos, 0.4, this.colliders);
