@@ -103,7 +103,7 @@ export function buildWorld(scene: THREE.Scene) {
     { t: "EL CAFÉ\nNO ES\nGRATIS", bg: "#8a5a2b", x: 4, z: halfZ - 0.2, ry: Math.PI },
   ];
   for (const p of posters) {
-    const tex = textTexture(p.t, 256, 320, p.bg, "#fff", 52);
+    const tex = textTexture(p.t, 256, 320, p.bg, "#fff", 36);
     const m = new THREE.MeshBasicMaterial({ map: tex });
     const pl = add(new THREE.PlaneGeometry(2, 2.5), m, p.x, 2.3, p.z);
     pl.rotation.y = p.ry;
