@@ -145,7 +145,7 @@ try {
   await S.page.evaluate(() => {
     const g = window.__game;
     g.team.score = 10;
-    g.warnBoss(performance.now() + 1500);
+    g.startEvent("boss", 1500);
   });
   await sleep(500);
   note(await S.page.isVisible("#boss-alert"), "Aparece el aviso de que viene el jefe");
@@ -155,6 +155,32 @@ try {
   const bossToast = (await S.page.textContent("#toast")).trim();
   note(bossScore === 5 && /pillado/.test(bossToast), `El jefe pilla al jugador de pie (cuota 10 -> ${bossScore}: ${bossToast})`);
   await S.page.screenshot({ path: `${OUT}/09-jefe-paseando.png` });
+
+  // ---- Desastres: redada (de pie no pasa nada), virus en una llamada y apagón ----
+  await S.page.evaluate(() => window.__game.startEvent("police", 800));
+  await sleep(1500);
+  const policeScore = await S.page.evaluate(() => window.__game.team.score);
+  note(policeScore === 5, `Redada: si no estás al teléfono no pierdes cuota (${policeScore})`);
+  await S.page.evaluate(() => {
+    const g = window.__game;
+    const d = g.desks[1];
+    g.me.pos.set(d.seat.x, 0, d.seat.z + 0.2);
+  });
+  await sleep(300);
+  await S.page.keyboard.press("e");
+  await sleep(1500);
+  await S.page.evaluate(() => window.__game.startEvent("virus", 0));
+  await sleep(2500);
+  const popups = await S.page.locator("#desk .popup").count();
+  note(popups >= 1, `Virus: salen ventanas emergentes en la llamada (${popups})`);
+  await S.page.screenshot({ path: `${OUT}/10-virus.png` });
+  await S.page.evaluate(() => window.__game.startEvent("blackout", 0));
+  await sleep(1200);
+  const deskOpen = await S.page.isVisible("#desk");
+  note(!deskOpen, "Apagón: se corta la llamada");
+  await S.page.screenshot({ path: `${OUT}/11-apagon.png` });
+  const day = (await S.page.textContent("#h-day")).trim();
+  note(/Día 1/.test(day), `Se muestra el día (${day})`);
 } catch (e) {
   note(false, `Excepción: ${String(e).slice(0, 300)}`);
 }

@@ -1,19 +1,13 @@
 // Servidor del juego: un Worker que enruta WebSockets a un Durable Object por sala.
 // Cada sala (código de 3 a 8 letras/números) admite hasta MAX_PLAYERS jugadores.
+import { EVENTS, SHIFT_MS, scheduleShift, targetFor, type EventKind } from "../../client/src/events";
 
 export interface Env {
   ROOMS: DurableObjectNamespace;
 }
 
 const MAX_PLAYERS = 4;
-const SHIFT_MS = 240_000; // duración del turno
 const OVER_MS = 15_000; // pausa entre turnos
-const QUOTA_PER_PLAYER = 30;
-// Evento del jefe (mismos valores que client/src/config.ts)
-const BOSS_MIN_MS = 60_000;
-const BOSS_MAX_MS = 180_000;
-const BOSS_WARN_MS = 8_000;
-const BOSS_PENALTY = 5;
 
 type Player = {
   id: number;
@@ -48,9 +42,10 @@ export class Room implements DurableObject {
   private score = 0;
   private phase: "shift" | "over" = "shift";
   private phaseEnd = 0;
-  private bossAt = 0; // cuándo se avisa de la ronda del jefe (0 = ya hecha)
-  private bossArrive = 0; // cuándo llega el jefe
-  private caught = new Set<number>(); // jugadores ya penalizados en esta ronda
+  private day = 1;
+  private events: { kind: EventKind; at: number }[] = []; // desastres pendientes del turno (hora absoluta)
+  private arrive = new Map<EventKind, number>(); // cuándo llegó el jefe o la policía
+  private caught = new Set<string>(); // "evento:jugador" ya penalizados
 
   constructor(private state: DurableObjectState, _env: Env) {}
 
@@ -73,7 +68,7 @@ export class Room implements DurableObject {
   }
 
   private target(): number {
-    return QUOTA_PER_PLAYER * Math.max(1, this.players.size);
+    return targetFor(this.day, this.players.size);
   }
 
   private teamMsg() {
@@ -82,6 +77,7 @@ export class Room implements DurableObject {
       score: this.score,
       target: this.target(),
       phase: this.phase,
+      day: this.day,
       left: Math.max(0, this.phaseEnd - Date.now()),
     };
   }
@@ -153,13 +149,17 @@ export class Room implements DurableObject {
       this.score += pts;
       this.broadcast({ ...this.teamMsg(), by: p.id, pts });
     } else if (msg.t === "caught" && this.phase === "shift") {
-      // cada cliente comprueba si su jugador estaba sentado; aquí solo se valida la ventana
+      // cada cliente comprueba si su jugador estaba sentado o al teléfono; aquí se valida la ventana
+      const kind: EventKind = msg.kind === "police" ? "police" : "boss";
+      const at = this.arrive.get(kind);
       const now = Date.now();
-      if (!this.bossArrive || now < this.bossArrive - 2000 || now > this.bossArrive + 5000) return;
-      if (this.caught.has(p.id)) return;
-      this.caught.add(p.id);
-      this.score = Math.max(0, this.score - BOSS_PENALTY);
-      this.broadcast({ ...this.teamMsg(), by: p.id, pts: -BOSS_PENALTY });
+      if (!at || now < at - 2000 || now > at + 5000) return;
+      const key = `${kind}:${p.id}`;
+      if (this.caught.has(key)) return;
+      this.caught.add(key);
+      const pen = EVENTS[kind].penalty;
+      this.score = Math.max(0, this.score - pen);
+      this.broadcast({ ...this.teamMsg(), by: p.id, pts: -pen, kind });
     }
   }
 
@@ -170,6 +170,7 @@ export class Room implements DurableObject {
     this.broadcast({ t: "leave", id: p.id });
     if (this.players.size === 0) {
       this.score = 0;
+      this.day = 1;
       this.state.storage.deleteAlarm();
     } else {
       this.broadcast(this.teamMsg());
@@ -177,30 +178,44 @@ export class Room implements DurableObject {
   }
 
   private async startShift() {
+    const now = Date.now();
     this.phase = "shift";
     this.score = 0;
-    this.phaseEnd = Date.now() + SHIFT_MS;
-    this.bossAt = Date.now() + BOSS_MIN_MS + Math.random() * (BOSS_MAX_MS - BOSS_MIN_MS);
-    this.bossArrive = 0;
+    this.phaseEnd = now + SHIFT_MS;
+    this.events = scheduleShift(this.day).map((e) => ({ kind: e.kind, at: now + e.at }));
+    this.arrive.clear();
     this.caught.clear();
-    await this.state.storage.setAlarm(this.bossAt);
+    await this.state.storage.setAlarm(this.nextAlarm());
+  }
+
+  private nextAlarm(): number {
+    return Math.min(this.events[0]?.at ?? Infinity, this.phaseEnd);
   }
 
   async alarm() {
     if (this.players.size === 0) return;
-    if (this.phase === "shift" && this.bossAt && Date.now() < this.phaseEnd) {
-      // primero la ronda del jefe; después, el final del turno
-      this.bossAt = 0;
-      this.bossArrive = Date.now() + BOSS_WARN_MS;
-      this.broadcast({ t: "boss", in: BOSS_WARN_MS });
-      await this.state.storage.setAlarm(this.phaseEnd);
-      return;
-    }
+    const now = Date.now();
     if (this.phase === "shift") {
+      // desastres que tocan ahora
+      while (this.events.length && this.events[0].at <= now + 50 && now < this.phaseEnd) {
+        const { kind } = this.events.shift()!;
+        const { warnMs } = EVENTS[kind];
+        this.arrive.set(kind, now + warnMs);
+        for (const k of this.caught) if (k.startsWith(`${kind}:`)) this.caught.delete(k); // nueva visita, nuevas multas
+        this.broadcast({ t: "event", kind, in: warnMs });
+      }
+      if (now < this.phaseEnd - 50) {
+        await this.state.storage.setAlarm(this.nextAlarm());
+        return;
+      }
+      // fin del turno: día siguiente o despido
+      const win = this.score >= this.target();
       this.phase = "over";
-      this.phaseEnd = Date.now() + OVER_MS;
+      this.events = [];
+      this.day = win ? this.day + 1 : 1;
+      this.phaseEnd = now + OVER_MS;
       await this.state.storage.setAlarm(this.phaseEnd);
-      this.broadcast({ ...this.teamMsg(), win: this.score >= this.target() });
+      this.broadcast({ ...this.teamMsg(), win });
     } else {
       await this.startShift();
       this.broadcast(this.teamMsg());

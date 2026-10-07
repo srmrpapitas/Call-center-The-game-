@@ -1,13 +1,5 @@
 export const GAME_TITLE = "CALL CENTER"; // título provisional: se cambia solo aquí y en index.html
-export const SHIFT_SECONDS = 240;
 export const MAX_PLAYERS = 4;
-export const QUOTA_PER_PLAYER = 30;
-// Evento del jefe: una ronda por turno, entre BOSS_MIN y BOSS_MAX segundos después de empezar.
-// Avisa con BOSS_WARN_SECONDS de margen; quien no esté sentado en un puesto pierde BOSS_PENALTY.
-export const BOSS_MIN_SECONDS = 60;
-export const BOSS_MAX_SECONDS = 180;
-export const BOSS_WARN_SECONDS = 8;
-export const BOSS_PENALTY = 5;
 
 export type Accessory = "none" | "headset" | "glasses" | "tie" | "bun" | "beard";
 

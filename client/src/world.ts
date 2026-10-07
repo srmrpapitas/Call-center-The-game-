@@ -61,7 +61,8 @@ export function buildWorld(scene: THREE.Scene) {
   // Luz y ambiente
   scene.background = new THREE.Color(0x1b2430);
   scene.fog = new THREE.Fog(0x1b2430, 22, 48);
-  scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x3a3326, 1.05));
+  const hemi = new THREE.HemisphereLight(0xdfe8ff, 0x3a3326, 1.05);
+  scene.add(hemi);
   const sun = new THREE.DirectionalLight(0xfff1d6, 0.8);
   sun.position.set(6, 14, 8);
   scene.add(sun);
@@ -87,10 +88,11 @@ export function buildWorld(scene: THREE.Scene) {
   box(halfX * 2, 0.35, 0.32, 0x6a5a46, 0, 0.17, -halfZ + 0.02);
   box(halfX * 2, 0.35, 0.32, 0x6a5a46, 0, 0.17, halfZ - 0.02);
 
-  // Luces de techo
+  // Luces de techo (un solo material: el apagón las apaga todas)
+  const ceilingMat = lam(0xffffff, 0xfff6d6);
   for (let x = -9; x <= 9; x += 6) {
     for (let z = -6; z <= 6; z += 6) {
-      add(new THREE.BoxGeometry(2.2, 0.08, 0.7), lam(0xffffff, 0xfff6d6), x, 3.95, z);
+      add(new THREE.BoxGeometry(2.2, 0.08, 0.7), ceilingMat, x, 3.95, z);
     }
   }
 
@@ -183,7 +185,7 @@ export function buildWorld(scene: THREE.Scene) {
   solid(1.4, 1.1, 0.9, 0xb8bcc4, -11.6, 0.55, 5.5);
   box(1.4, 0.1, 0.9, 0x6a6e76, -11.6, 1.15, 5.5);
 
-  return { colliders, desks };
+  return { colliders, desks, lights: { hemi, sun, ceiling: ceilingMat } };
 }
 
 // Empuja un círculo fuera de las cajas.

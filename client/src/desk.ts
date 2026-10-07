@@ -38,6 +38,9 @@ export class DeskUI {
   /** Lo que hacer con una frase oída por voz en la ronda actual (también lo usa la prueba de humo). */
   heard: (text: string) => void = () => {};
   current: CallDef | null = null;
+  /** Cuelga la llamada en curso desde fuera (apagón, redada). */
+  abort: () => void = () => {};
+  private virusTimer = 0;
   bankCode = ""; // nº de cuenta que dicta el cliente (lo lee también la prueba de humo) // llamada en curso (la usa también la prueba de humo)
   roundIdx = 0;
 
@@ -105,6 +108,7 @@ export class DeskUI {
       let startAt = 0;
       let finished = false;
 
+      this.abort = () => end(null);
       const end = (v: number | null) => {
         if (finished) return;
         finished = true;
@@ -130,8 +134,13 @@ export class DeskUI {
         const rep = $("c-reply");
         rep.classList.remove("hidden");
         rep.textContent = call.react[key];
-        void this.playSeq([client(key, call.react[key])]);
         $("c-talk").parentElement!.classList.add("hidden");
+        if (deal) {
+          // nº de cuenta nuevo en cada llamada: el cliente lo dicta después de su frase del trato
+          this.bankCode = Array.from({ length: 8 }, () => Math.floor(Math.random() * 10)).join("");
+          const digits = [...this.bankCode].join(", ");
+          void this.playSeq([client(key, call.react[key]), { file: "general_cuenta.mp3", text: `Apunta: ${digits}`, voice: call.voice, who: call.id }]);
+        } else void this.playSeq([client(key, call.react[key])]);
         if (deal) {
           sfx.done();
           void this.openBank(call).then((emptied) => !finished && showResult(true, emptied));
@@ -282,8 +291,7 @@ export class DeskUI {
   // Devuelve si se vació.
   private openBank(call: CallDef): Promise<boolean> {
     const BANK_MS = 60000;
-    const code = Array.from({ length: 8 }, () => Math.floor(Math.random() * 10)).join("");
-    this.bankCode = code;
+    const code = this.bankCode;
     const acct = $<HTMLInputElement>("b-acct");
     const pass = $<HTMLInputElement>("b-pass");
     const msg = $("b-msg");
@@ -431,6 +439,49 @@ export class DeskUI {
     b.classList.toggle("on", on);
     b.textContent = on ? "🔴 Escuchando… (toca para parar)" : "🎙️ Hablar";
     if (msg !== undefined) $("c-heard").textContent = msg;
+  }
+
+  /** Virus: mientras dure, salen ventanas emergentes que hay que cerrar para poder ver la llamada. */
+  setVirus(on: boolean) {
+    const mon = document.querySelector<HTMLElement>("#desk .monitor")!;
+    if (!on) {
+      clearInterval(this.virusTimer);
+      this.virusTimer = 0;
+      mon.querySelectorAll(".popup").forEach((p) => p.remove());
+      return;
+    }
+    if (this.virusTimer) return;
+    const ADS = [
+      ["🎉 ¡ENHORABUENA!", "Eres el visitante 1.000.000. Has ganado un iPhone 47."],
+      ["⚠️ ALERTA", "Tu PC tiene 37 virus. Llama al 900 000 000 (somos nosotros)."],
+      ["💊 OFERTA", "Pastillas para crecer… la cuota. Solo hoy."],
+      ["👩 Solteras en tu zona", "Quieren hablar contigo de garantías extendidas."],
+      ["🪙 CRIPTO", "Invierte en CallCoin. Sube seguro. Bueno, sube."],
+      ["🧹 Limpiador PRO", "Hemos encontrado 4.812 problemas. Pagar para ver."],
+    ];
+    const spawn = () => {
+      if (!this.active || mon.querySelectorAll(".popup").length >= 6) return;
+      const [title, text] = ADS[Math.floor(Math.random() * ADS.length)];
+      const p = document.createElement("div");
+      p.className = "popup";
+      p.style.left = `${5 + Math.random() * 55}%`;
+      p.style.top = `${10 + Math.random() * 55}%`;
+      const bar = document.createElement("div");
+      bar.className = "popup-bar";
+      const b = document.createElement("b");
+      b.textContent = title;
+      const x = document.createElement("button");
+      x.textContent = "✕";
+      x.onclick = () => p.remove();
+      bar.append(b, x);
+      const body = document.createElement("div");
+      body.textContent = text;
+      p.append(bar, body);
+      mon.appendChild(p);
+      sfx.bad();
+    };
+    spawn();
+    this.virusTimer = window.setInterval(spawn, 1800);
   }
 
   private seq = 0;

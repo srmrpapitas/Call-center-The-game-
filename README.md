@@ -24,7 +24,11 @@ npm --prefix client run build
 npm run dev:server            # http://localhost:8787  (sirve también el cliente)
 ```
 
-**El jefe:** una vez por turno, Don Bonifacio sale de Dirección y recorre la oficina. Suena una alarma y tenéis 8 segundos para sentaros en un puesto; quien le pille de pie resta 5 de cuota al equipo.
+**Días y desastres:** cada partida es un día de 10 minutos. Si cumplís la cuota pasáis al día siguiente (+25 % de cuota y más caos); si no, os despiden y volvéis al día 1.
+- 🚨 **El jefe** pasa dos veces al día: quien le pille de pie resta 5 de cuota (sentaos en un puesto).
+- 🚔 **Redada** (desde el día 2): quien esté al teléfono cuando entre la policía resta 8 (colgad y alejaos).
+- 🦠 **Virus**: ventanas emergentes en el escritorio durante 20 s.
+- 🔌 **Apagón**: 15 s sin luz y sin llamadas.
 
 Controles: `WASD` mover · `Mayús` correr · arrastrar ratón: cámara · rueda: zoom · `E` en un puesto para hacer una llamada · para responder: clic en la frase, `1/2/3` o léela en voz alta (botón «Responder con la voz», en Chrome o Edge) · `Esc` levantarse.
 

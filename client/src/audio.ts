@@ -45,6 +45,12 @@ export const sfx = {
   boss() {
     for (let i = 0; i < 4; i++) tone(i % 2 ? 440 : 587, i * 0.18, 0.15, "square", 0.07);
   },
+  siren() {
+    for (let i = 0; i < 6; i++) tone(i % 2 ? 960 : 720, i * 0.28, 0.26, "sawtooth", 0.05);
+  },
+  powerDown() {
+    [300, 220, 150, 90].forEach((f, i) => tone(f, i * 0.12, 0.2, "square", 0.07));
+  },
   over() {
     [392, 330, 262].forEach((f, i) => tone(f, i * 0.2, 0.3, "sawtooth", 0.08));
   },

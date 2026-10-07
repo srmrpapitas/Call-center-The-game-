@@ -4,7 +4,8 @@ import { buildWorld, resolveCollisions, type Box, type DeskSpot } from "./world"
 import { Net, type Msg } from "./net";
 import { DeskUI } from "./desk";
 import { pickCall } from "./calls";
-import { BOSS, BOSS_MAX_SECONDS, BOSS_MIN_SECONDS, BOSS_PENALTY, BOSS_WARN_SECONDS, CAST, QUOTA_PER_PLAYER, SHIFT_SECONDS } from "./config";
+import { BOSS, CAST } from "./config";
+import { EVENTS, SHIFT_MS, scheduleShift, targetFor, type EventKind } from "./events";
 import { sfx, audioCtx } from "./audio";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -40,7 +41,7 @@ export class Game {
   private others = new Map<number, Remote>();
   private net = new Net();
   private online = false;
-  private team = { score: 0, target: QUOTA_PER_PLAYER, phase: "shift" as "shift" | "over", endAt: 0, win: false };
+  private team = { score: 0, target: targetFor(1, 1), phase: "shift" as "shift" | "over", endAt: 0, win: false, day: 1 };
   private keys = new Set<string>();
   private stick = { x: 0, y: 0 }; // joystick táctil (-1..1)
   private run = false; // botón táctil de correr
@@ -58,9 +59,14 @@ export class Game {
   private lastPhase = "";
   private toastTimer = 0;
   private boss: Avatar;
-  private bossAt = 0; // modo solo: cuándo suena el aviso (0 = no hay ronda pendiente)
-  private bossArrive = 0; // cuándo llega el jefe (0 = sin aviso activo)
-  private bossWalkStart = 0; // >0 mientras recorre la oficina
+  private bossWalkStart = 0; // >0 mientras el jefe recorre la oficina
+  private lights!: ReturnType<typeof buildWorld>["lights"];
+  // desastres del turno (ver events.ts)
+  private pending: { kind: EventKind; at: number }[] = []; // modo solo: los que faltan (hora absoluta)
+  private warning: { kind: "boss" | "police"; arriveAt: number } | null = null;
+  private virusUntil = 0;
+  private blackoutUntil = 0;
+  private policeUntil = 0; // luces de la policía en la oficina
 
   constructor(private canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -68,6 +74,7 @@ export class Game {
     const w = buildWorld(this.scene);
     this.colliders = w.colliders;
     this.desks = w.desks;
+    this.lights = w.lights;
     this.boss = buildAvatar(BOSS);
     this.boss.group.scale.setScalar(1.12);
     this.boss.group.visible = false;
@@ -190,7 +197,7 @@ export class Game {
     const tag = this.makeTag(o.name, true);
     this.me = { id: 0, av, pos: new THREE.Vector3((Math.random() - 0.5) * 3, 0, (Math.random() - 0.5) * 2), ry: 0, moving: false, name: o.name, skin: o.skin, tag };
     this.yaw = 0;
-    this.team = { score: 0, target: QUOTA_PER_PLAYER, phase: "shift", endAt: performance.now() + SHIFT_SECONDS * 1000, win: false };
+    this.team = { score: 0, target: targetFor(1, 1), phase: "shift", endAt: performance.now() + SHIFT_MS, win: false, day: 1 };
 
     if (o.code) {
       this.net.onMessage = (m) => this.onNet(m);
@@ -210,7 +217,7 @@ export class Game {
     }
     if (!this.online) {
       $("h-room").textContent = "Solo";
-      this.scheduleBoss();
+      this.scheduleShift();
     }
     this.running = true;
     this.clock.start();
@@ -262,11 +269,12 @@ export class Game {
         if (m.by && m.by !== this.me.id) {
           const r = this.others.get(m.by);
           if (r && m.pts > 0) this.toast(`${r.name} suma +${m.pts} de cuota`);
-          else if (r && m.pts < 0) this.toast(`El jefe ha pillado a ${r.name} de paseo (${m.pts})`);
+          else if (r && m.pts < 0)
+            this.toast(m.kind === "police" ? `🚔 La policía ha pillado a ${r.name} al teléfono (${m.pts})` : `El jefe ha pillado a ${r.name} de paseo (${m.pts})`);
         }
         break;
-      case "boss":
-        this.warnBoss(performance.now() + Number(m.in));
+      case "event":
+        if (m.kind in EVENTS) this.startEvent(m.kind as EventKind, Number(m.in) || 0);
         break;
     }
   }
@@ -277,6 +285,7 @@ export class Game {
     this.team.phase = t.phase;
     this.team.endAt = performance.now() + t.left;
     this.team.win = !!t.win;
+    if (t.day) this.team.day = t.day;
   }
 
   private addRemote(p: any) {
@@ -294,6 +303,7 @@ export class Game {
   // ---------- interacción ----------
   private trySit() {
     if (this.seated || !this.nearDesk || this.team.phase !== "shift") return;
+    if (performance.now() < this.blackoutUntil) return this.toast("🔌 Sin luz no hay llamadas. Espera a que vuelva.");
     const d = this.nearDesk;
     this.seated = d;
     this.me.pos.copy(d.seat);
@@ -309,7 +319,9 @@ export class Game {
         if (this.online) this.net.send({ t: "call", pts });
         this.toast(pts >= 5 ? `+${pts} de cuota` : pts > 0 ? `+${pts} de cuota (flojo)` : "0 de cuota");
       } else {
-        this.toast("Colgaste a mitad de llamada");
+        const now = performance.now();
+        if (now < this.blackoutUntil) this.toast("🔌 ¡Apagón! Se ha cortado la llamada");
+        else if (now >= this.policeUntil) this.toast("Colgaste a mitad de llamada"); // la redada ya avisa
       }
       this.seated = null;
     });
@@ -345,7 +357,7 @@ export class Game {
     this.updateMe(dt, t);
     this.updateOthers(dt, t);
     this.updateTeam();
-    this.updateBoss(t);
+    this.updateEvents(t);
     this.updateCamera(dt);
     this.updateHud();
     this.updateTags();
@@ -396,7 +408,7 @@ export class Game {
         }
       }
     }
-    $("prompt").classList.toggle("hidden", !this.nearDesk);
+    $("prompt").classList.toggle("hidden", !this.nearDesk || performance.now() < this.blackoutUntil);
 
     // red
     const now = performance.now();
@@ -423,72 +435,113 @@ export class Game {
     const now = performance.now();
     if (now >= this.team.endAt) {
       if (this.team.phase === "shift") {
+        // fin del día: día siguiente con más cuota, o despido y vuelta al día 1
         this.team.phase = "over";
         this.team.win = this.team.score >= this.team.target;
+        this.team.day = this.team.win ? this.team.day + 1 : 1;
         this.team.endAt = now + 12000;
       } else {
         this.team.phase = "shift";
         this.team.score = 0;
         this.team.win = false;
-        this.team.endAt = now + SHIFT_SECONDS * 1000;
-        this.scheduleBoss();
+        this.team.target = targetFor(this.team.day, 1);
+        this.team.endAt = now + SHIFT_MS;
+        this.scheduleShift();
       }
     }
   }
 
-  // ---------- el jefe ----------
-  private scheduleBoss() {
-    const s = BOSS_MIN_SECONDS + Math.random() * (BOSS_MAX_SECONDS - BOSS_MIN_SECONDS);
-    this.bossAt = performance.now() + s * 1000;
+  // ---------- desastres: jefe, redada, virus y apagón ----------
+  private scheduleShift() {
+    const now = performance.now();
+    this.pending = scheduleShift(this.team.day).map((e) => ({ kind: e.kind, at: now + e.at }));
   }
 
-  private warnBoss(arriveAt: number) {
+  private startEvent(kind: EventKind, warnMs: number) {
     if (this.team.phase !== "shift") return;
-    this.bossArrive = arriveAt;
-    $("boss-alert").classList.remove("hidden");
-    sfx.boss();
+    const now = performance.now();
+    if (kind === "boss" || kind === "police") {
+      this.warning = { kind, arriveAt: now + warnMs };
+      const alert = $("boss-alert");
+      alert.classList.remove("hidden");
+      alert.classList.toggle("police", kind === "police");
+      kind === "police" ? sfx.siren() : sfx.boss();
+    } else if (kind === "virus") {
+      this.virusUntil = now + EVENTS.virus.durMs;
+      this.toast("🦠 ¡Virus en la red! Cierra las ventanas emergentes para seguir llamando");
+      sfx.bad();
+    } else {
+      this.blackoutUntil = now + EVENTS.blackout.durMs;
+      this.toast("🔌 ¡Apagón! Se cortan todas las llamadas");
+      sfx.powerDown();
+      if (this.seated) this.ui.abort();
+    }
   }
 
-  private clearBoss() {
-    this.bossAt = 0;
-    this.bossArrive = 0;
+  private clearEvents() {
+    this.pending = [];
+    this.warning = null;
+    this.virusUntil = this.blackoutUntil = this.policeUntil = 0;
     this.bossWalkStart = 0;
     this.boss.group.visible = false;
     $("boss-alert").classList.add("hidden");
   }
 
-  // Al llegar, quien no esté sentado atendiendo una llamada pierde cuota.
-  private inspect() {
+  // El jefe pilla a quien NO está sentado; la policía, a quien SÍ está al teléfono.
+  private arrive(kind: "boss" | "police") {
     $("boss-alert").classList.add("hidden");
-    this.bossWalkStart = performance.now();
-    this.boss.group.visible = true;
-    if (this.seated) {
-      this.toast(`${BOSS.name} pasa por detrás… y asiente. Te has librado.`);
-      return;
+    const now = performance.now();
+    const pen = EVENTS[kind].penalty;
+    let caught: boolean;
+    if (kind === "boss") {
+      this.bossWalkStart = now;
+      this.boss.group.visible = true;
+      caught = !this.seated;
+      this.toast(caught ? `¡${BOSS.name} te ha pillado de paseo! −${pen} de cuota` : `${BOSS.name} pasa por detrás… y asiente. Te has librado.`);
+    } else {
+      this.policeUntil = now + 5000;
+      caught = !!this.seated;
+      if (caught) this.ui.abort();
+      this.toast(caught ? `🚔 ¡La policía te ha pillado al teléfono! −${pen} de cuota` : "🚔 La policía registra la oficina… y no encuentra nada. De momento.");
     }
+    if (!caught) return;
     sfx.bad();
-    this.toast(`¡${BOSS.name} te ha pillado de paseo! −${BOSS_PENALTY} de cuota`);
-    if (this.online) this.net.send({ t: "caught" });
-    else this.team.score = Math.max(0, this.team.score - BOSS_PENALTY);
+    if (this.online) this.net.send({ t: "caught", kind });
+    else this.team.score = Math.max(0, this.team.score - pen);
   }
 
-  private updateBoss(t: number) {
+  private updateEvents(t: number) {
     const now = performance.now();
-    if (!this.online && this.bossAt && now >= this.bossAt) {
-      this.bossAt = 0;
-      this.warnBoss(now + BOSS_WARN_SECONDS * 1000);
+    while (!this.online && this.pending.length && now >= this.pending[0].at) {
+      const { kind } = this.pending.shift()!;
+      this.startEvent(kind, EVENTS[kind].warnMs);
     }
-    if (this.bossArrive) {
-      const left = Math.ceil((this.bossArrive - now) / 1000);
+    if (this.warning) {
+      const left = Math.ceil((this.warning.arriveAt - now) / 1000);
       if (left > 0) {
-        $("boss-alert").textContent = `🚨 ¡Viene ${BOSS.name}! Siéntate en un puesto: ${left} s`;
+        $("boss-alert").textContent =
+          this.warning.kind === "boss"
+            ? `🚨 ¡Viene ${BOSS.name}! Siéntate en un puesto: ${left} s`
+            : `🚔 ¡REDADA! Cuelga y aléjate de los teléfonos: ${left} s`;
       } else {
-        this.bossArrive = 0;
-        this.inspect();
+        const kind = this.warning.kind;
+        this.warning = null;
+        this.arrive(kind);
       }
     }
+    this.ui.setVirus(now < this.virusUntil);
+
+    // luces: apagón, sirenas de la policía o normal
+    const dark = now < this.blackoutUntil;
+    const siren = now < this.policeUntil || this.warning?.kind === "police";
+    const L = this.lights;
+    L.hemi.intensity = dark ? 0.12 : 1.05;
+    L.sun.intensity = dark ? 0.03 : 0.8;
+    L.ceiling.emissive.setHex(dark ? 0x000000 : 0xfff6d6);
+    L.hemi.color.setHex(siren ? (Math.sin(t * 12) > 0 ? 0xff3b3b : 0x3b5bff) : 0xdfe8ff);
+
+    // el jefe recorre la oficina
     if (!this.bossWalkStart) return;
-    // avanzar por el recorrido según la distancia andada
     let d = ((now - this.bossWalkStart) / 1000) * BOSS_SPEED;
     const g = this.boss.group;
     for (let i = 1; i < BOSS_PATH.length; i++) {
@@ -546,17 +599,20 @@ export class Game {
     $("h-bar").style.width = `${pct}%`;
     $("h-bar").classList.toggle("done", this.team.score >= this.team.target);
     $("h-score").textContent = `Cuota ${this.team.score}/${this.team.target}`;
+    $("h-day").textContent = `📅 Día ${this.team.phase === "over" && this.team.win ? this.team.day - 1 : this.team.day}`;
 
     if (this.team.phase !== this.lastPhase) {
       this.lastPhase = this.team.phase;
       const end = $("end");
       if (this.team.phase === "over") {
-        this.clearBoss();
+        this.clearEvents();
+        if (this.seated) this.ui.abort();
         end.classList.remove("hidden");
-        $("end-title").textContent = this.team.win ? "¡Cuota cumplida!" : "Revisión del jefe: estáis despedidos";
+        const done = this.team.day - 1;
+        $("end-title").textContent = this.team.win ? `¡Día ${done} superado!` : "Revisión del jefe: estáis despedidos";
         $("end-text").textContent = this.team.win
-          ? "El jefe os felicita con un correo automático y una pizza de ayer."
-          : "El jefe lamenta comunicaros que ‘el equipo no ha estado a la altura’. Siguiente turno en unos segundos.";
+          ? `El jefe os felicita con un correo automático y una pizza de ayer. Mañana, día ${this.team.day}: más cuota y más caos.`
+          : "El jefe lamenta comunicaros que «el equipo no ha estado a la altura». Vuelta al día 1 con contratos nuevos (los mismos).";
         this.team.win ? sfx.done() : sfx.over();
       } else {
         end.classList.add("hidden");
