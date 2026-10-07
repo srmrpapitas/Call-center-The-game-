@@ -7,3 +7,5 @@ src-tauri/gen/
 src-tauri/icons/
 *.log
 smoke-out/
+# se genera con: npm run guion
+GUION-AUDIOS.md

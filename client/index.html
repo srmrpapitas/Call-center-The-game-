@@ -51,6 +51,8 @@
     #toast { position: fixed; top: 70px; left: 50%; transform: translateX(-50%); background: #11161de6; border: 1px solid #ffffff2a; border-radius: 10px; padding: 9px 16px; z-index: 30; }
     #boss-alert { position: fixed; top: 120px; left: 50%; transform: translateX(-50%); background: #b02a30f0; border: 2px solid #ffd27a; border-radius: 12px; padding: 10px 18px; font-weight: 800; z-index: 31; animation: pulse 0.6s ease-in-out infinite alternate; }
     @keyframes pulse { from { transform: translateX(-50%) scale(1); } to { transform: translateX(-50%) scale(1.06); } }
+    #d-avatar.talking { animation: wobble 0.45s ease-in-out infinite alternate; }
+    @keyframes wobble { from { transform: rotate(-9deg); } to { transform: rotate(9deg); } }
     #help { position: fixed; left: 12px; bottom: 12px; color: #ffffffa0; font-size: 12px; background: #11161d99; padding: 6px 10px; border-radius: 8px; }
     #labels { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
     .tag { position: absolute; left: 0; top: 0; background: #11161dcc; border-radius: 6px; padding: 2px 8px; font-size: 13px; font-weight: 600; white-space: nowrap; }
