@@ -23,6 +23,7 @@ type Player = {
   z: number;
   ry: number;
   m: boolean;
+  c: boolean; // hablando por teléfono
 };
 
 export default {
@@ -119,6 +120,7 @@ export class Room implements DurableObject {
         z: 0,
         ry: 0,
         m: false,
+        c: false,
       };
       this.players.set(ws, np);
       ws.send(
@@ -144,7 +146,8 @@ export class Room implements DurableObject {
       p.z = Math.max(-30, Math.min(30, z));
       p.ry = Number(msg.ry) || 0;
       p.m = !!msg.m;
-      this.broadcast({ t: "s", id: p.id, x: p.x, z: p.z, ry: p.ry, m: p.m }, ws);
+      p.c = !!msg.c;
+      this.broadcast({ t: "s", id: p.id, x: p.x, z: p.z, ry: p.ry, m: p.m, c: p.c }, ws);
     } else if (msg.t === "call" && this.phase === "shift") {
       const pts = Math.max(0, Math.min(9, Number(msg.pts) | 0));
       this.score += pts;
