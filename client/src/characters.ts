@@ -57,10 +57,10 @@ export function buildAvatar(look: number | CastDef): Avatar {
   head.scale.set(1, 1.05, 1);
   onHead(head, 0, 2.0, 0);
 
-  const eyes: THREE.Mesh[] = [];
+  const eyes: THREE.Object3D[] = []; // se ocultan si hay foto (ojos y gafas)
   for (const sx of [-0.14, 0.14]) {
     const eye = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.09, 0.05), dark);
-    eyes.push(onHead(eye, sx, 2.04, 0.37) as THREE.Mesh);
+    eyes.push(onHead(eye, sx, 2.04, 0.37));
   }
   // foto de la cara pegada delante, como una careta
   faceLoader.load(
@@ -99,7 +99,7 @@ export function buildAvatar(look: number | CastDef): Avatar {
   if (d.accessory === "glasses") {
     for (const sx of [-0.15, 0.15]) {
       const r = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.02, 4, 8), dark);
-      onHead(r, sx, 2.04, 0.43);
+      eyes.push(onHead(r, sx, 2.04, 0.43));
     }
   }
   if (d.accessory === "tie") {
