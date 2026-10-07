@@ -3,6 +3,8 @@ name: Prueba de humo
 on:
   push:
   workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   smoke:
     runs-on: ubuntu-latest
@@ -30,3 +32,13 @@ jobs:
         with:
           name: capturas
           path: smoke-out/
+      - name: Publicar capturas en la rama 'capturas'
+        if: always() && github.ref_name == 'prototipo-v0'
+        run: |
+          cd smoke-out
+          git init -q -b capturas
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add -A
+          git commit -q -m "Capturas de la prueba de humo"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" capturas
