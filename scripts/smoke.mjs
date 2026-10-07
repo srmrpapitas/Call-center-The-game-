@@ -107,7 +107,11 @@ try {
   // banco: escribir el nº de cuenta que dicta el cliente y vaciarla
   await A.page.waitForSelector("#bank:not(.hidden)", { timeout: 40000 });
   const code = await A.page.evaluate(() => window.__game.ui.bankCode);
+  await A.page.click("#pc-icons button");
+  await A.page.screenshot({ path: `${OUT}/05-pc-remoto.png` });
+  await A.page.click("#t-bank");
   await A.page.fill("#b-acct", code);
+  await A.page.fill("#b-pass", await A.page.evaluate(() => window.__game.ui.current.pc.password));
   await A.page.click("#b-enter");
   await A.page.waitForSelector("#b-account:not(.hidden)", { timeout: 5000 });
   await A.page.screenshot({ path: `${OUT}/05-banco.png` });

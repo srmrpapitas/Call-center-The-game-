@@ -29,6 +29,15 @@ export interface CallDef {
   rounds: CallRound[];
   react: Record<Reaction, string>;
   bank: { balance: number; extra: string }; // lo que hay en su cuenta (balance 0 = cuenta trampa)
+  // su ordenador (escritorio remoto): la contraseña del banco está escondida entre los archivos
+  pc: { password: string; files: PcFile[] };
+  voice: { pitch: number; rate: number }; // voz del navegador para las frases sin grabar
+}
+
+export interface PcFile {
+  icon: string;
+  name: string;
+  text: string;
 }
 
 export const TRUST_START = 25;
@@ -90,6 +99,16 @@ export const CALLS: CallDef[] = [
       cuelga: "Voy a llamar a Timmy. Al de verdad.",
     },
     bank: { balance: 3214.5, extra: "+ 14 caramelos de menta en la caja fuerte" },
+    pc: {
+      password: "misifu1998",
+      files: [
+        { icon: "📝", name: "Notas.txt", text: "Lista de la compra: leche, galletas, comida para el gato.\n\nIMPORTANTE: la contraseña del banco es el nombre del gato y el año de mi boda, todo junto y en minúsculas. Así no se me olvida." },
+        { icon: "🐱", name: "gato.jpg", text: "Un gato naranja mirando a cámara con desprecio.\nEn el collar pone: MISIFU." },
+        { icon: "🖼️", name: "Boda", text: "boda_harold_y_doris.jpg\n«14 de junio de 1998. El día más feliz de mi vida.» (Harold lleva el mismo jersey que hoy.)" },
+        { icon: "🗑️", name: "Papelera", text: "carta_de_timmy_que_nunca_escribió.docx" },
+      ],
+    },
+    voice: { pitch: 1.5, rate: 0.85 },
   },
   {
     id: "gary",
@@ -132,6 +151,16 @@ export const CALLS: CallDef[] = [
       cuelga: "Me voy al búnker. No vuelvas a llamar.",
     },
     bank: { balance: 48210, extra: "+ 3 lingotes enterrados en el jardín (no declarados)" },
+    pc: {
+      password: "lagarto404",
+      files: [
+        { icon: "📝", name: "NO ABRIR.txt", text: "Si estás leyendo esto, ya te vigilan.\nContraseña partida en dos por seguridad: la primera parte está en el búnker, la segunda en el historial." },
+        { icon: "📁", name: "Búnker", text: "inventario.txt\n- 40 latas de judías\n- 3 linternas\n- Parte 1 de la contraseña: lagarto" },
+        { icon: "🌐", name: "Navegador", text: "Historial:\n· cómo saber si mi vecino es un lagarto\n· error 404 significa que el gobierno borró la página\n· parte 2 de mi contraseña: 404 (borrar esto)" },
+        { icon: "🗑️", name: "Papelera", text: "gorro_de_aluminio_v1.stl\ngorro_de_aluminio_v2_ahora_con_antena.stl" },
+      ],
+    },
+    voice: { pitch: 0.9, rate: 1.25 },
   },
   {
     id: "karen",
@@ -174,6 +203,16 @@ export const CALLS: CallDef[] = [
       cuelga: "Una estrella. Y te denuncio en Facebook.",
     },
     bank: { balance: 15999.99, extra: "+ un vale para 40 velas aromáticas" },
+    pc: {
+      password: "manager123",
+      files: [
+        { icon: "📝", name: "Quejas.txt", text: "Queja 847: el camarero respiró demasiado alto.\nQueja 848: el banco dice que mi contraseña es «demasiado fácil». Exigir hablar con su encargado." },
+        { icon: "🟨", name: "Post-it en la pantalla", text: "Contraseña del banco: manager123\n(No se la digas a NADIE, Karen)" },
+        { icon: "🖼️", name: "Fotos", text: "selfie_quejandome_1.jpg … selfie_quejandome_412.jpg" },
+        { icon: "🕯️", name: "Pedidos", text: "40 velas aromáticas «Lavanda de la venganza». Estado: reembolso exigido." },
+      ],
+    },
+    voice: { pitch: 1.2, rate: 1.15 },
   },
   {
     id: "herbert",
@@ -216,6 +255,16 @@ export const CALLS: CallDef[] = [
       cuelga: "Me voy a ver la tele. Al menos ella no me pide nada.",
     },
     bank: { balance: 27650, extra: "+ la pensión de Martha, que nadie ha dado de baja" },
+    pc: {
+      password: "martha1960",
+      files: [
+        { icon: "📝", name: "Para Martha.txt", text: "Querida Martha: hoy he vuelto a poner tu canción.\nEl banco me pide otra contraseña. He puesto tu nombre y el año en que nos conocimos, como siempre." },
+        { icon: "🖼️", name: "Fotos", text: "baile_del_pueblo.jpg\n«El verano de 1960, la noche que conocí a Martha.»" },
+        { icon: "👑", name: "Carta del Príncipe.pdf", text: "Querido Herbert: Su Alteza agradece su confianza. Por favor, no enseñe esta carta a su sobrino." },
+        { icon: "🗑️", name: "Papelera", text: "Vacía. Herbert la vacía todos los domingos, después de misa." },
+      ],
+    },
+    voice: { pitch: 0.7, rate: 0.8 },
   },
   {
     id: "bob",
@@ -258,6 +307,16 @@ export const CALLS: CallDef[] = [
       cuelga: "Gracias por los cuarenta minutos. Suscríbete al canal.",
     },
     bank: { balance: 0, extra: "Mensaje del banco: «Hola, soy Bob. Saluda a la cámara 👋»" },
+    pc: {
+      password: "suscribete",
+      files: [
+        { icon: "📝", name: "LEEME_ESTAFADOR.txt", text: "Hola, amigo. Llevas un buen rato en mi ordenador de pega.\nLa contraseña del banco es: suscribete\nDisfruta." },
+        { icon: "🎥", name: "Grabando…", text: "● EN DIRECTO — 2 h 14 min\nEspectadores: 18.402\nChat: «jajaja ha entrado al PC falso»" },
+        { icon: "📊", name: "estafadores.xlsx", text: "Lista de estafadores pillados. Tú estás en la fila 931." },
+        { icon: "🗑️", name: "Papelera", text: "virus_para_devolver_al_estafador.exe (no lo abras… ¿o sí?)" },
+      ],
+    },
+    voice: { pitch: 1, rate: 1.05 },
   },
   {
     id: "brenda",
@@ -300,6 +359,16 @@ export const CALLS: CallDef[] = [
       cuelga: "Me voy a hacer un directo llorando por esto.",
     },
     bank: { balance: 912.3, extra: "+ 3 millones de seguidores comprados" },
+    pc: {
+      password: "brenda4ever",
+      files: [
+        { icon: "📝", name: "Ideas para vídeos.txt", text: "1. Reaccionar a mi propio vídeo.\n2. Rutina de mañana (a las 14:00).\n3. Decir mi contraseña sin querer en directo (brenda4ever). NO HACER." },
+        { icon: "🖼️", name: "Fotos (2.348)", text: "Todas iguales: Brenda con cara de sorpresa." },
+        { icon: "🌐", name: "Navegador", text: "Pestañas abiertas:\n· comprar seguidores\n· comprar más seguidores\n· cómo hacer amigos de verdad" },
+        { icon: "🗑️", name: "Papelera", text: "sinceridad.mp4 (0 visualizaciones)" },
+      ],
+    },
+    voice: { pitch: 1.6, rate: 1.25 },
   },
 ];
 

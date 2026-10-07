@@ -128,9 +128,23 @@
     .bank header small { color: #7dffb088; font-weight: 400; }
     .bank label { font-size: 12px; color: #a6e8c0; }
     .b-dict { font-size: 22px; letter-spacing: 0.15em; color: #fff; margin: 4px 0 8px; }
-    .b-row { display: flex; gap: 8px; }
-    #b-acct { flex: 1; min-width: 0; font: 700 22px ui-monospace, Menlo, Consolas, monospace; letter-spacing: 0.25em; background: #06170f; color: #7dffb0; border: 1px solid #2f8f5b; }
-    #b-acct.shake { animation: shake 0.3s; border-color: var(--bad); }
+    .bank .tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+    .bank .tabs button { flex: 1; background: #06170f; color: #a6e8c0; border: 1px solid #2f8f5b; }
+    .bank .tabs button.on { background: #2fcf73; color: #04150b; }
+    #pc { background: linear-gradient(160deg, #1f5fa8, #3b8ad6); border-radius: 8px; padding: 10px; min-height: 190px; position: relative; color: #fff; font-family: system-ui, sans-serif; }
+    .pc-head { font-size: 12px; opacity: 0.85; margin-bottom: 8px; }
+    .pc-icons { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
+    .pc-icons button { background: none; border: 0; color: #fff; font-size: 12px; padding: 6px 2px; border-radius: 6px; font-family: system-ui, sans-serif; font-weight: 600; }
+    .pc-icons button:hover, .pc-icons button.seen { background: #ffffff26; }
+    .pc-icons span { display: block; font-size: 34px; }
+    .pc-file { position: absolute; inset: 30px 10px 10px; background: #f4f6f9; color: #1b2430; border-radius: 6px; box-shadow: 0 8px 24px #0008; display: flex; flex-direction: column; }
+    .pc-fbar { display: flex; justify-content: space-between; align-items: center; background: #d7dde6; padding: 4px 8px; border-radius: 6px 6px 0 0; font-size: 13px; }
+    .pc-fbar button { background: #ef5a5a; color: #fff; padding: 2px 8px; }
+    .pc-file pre { margin: 0; padding: 10px; white-space: pre-wrap; font: 14px/1.4 ui-monospace, Menlo, Consolas, monospace; overflow: auto; }
+    #bankpane label { display: block; margin-top: 6px; }
+    #b-acct, #b-pass { width: 100%; font: 700 20px ui-monospace, Menlo, Consolas, monospace; letter-spacing: 0.12em; background: #06170f; color: #7dffb0; border: 1px solid #2f8f5b; margin: 4px 0; }
+    #b-enter { width: 100%; margin-top: 6px; }
+    #b-acct.shake, #b-pass.shake { animation: shake 0.3s; border-color: var(--bad); }
     @keyframes shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
     .bank button { background: #2fcf73; color: #04150b; border: 0; border-radius: 8px; padding: 10px 14px; font-weight: 800; font-family: inherit; }
     .bank .timer { margin: 10px 0 0; }
@@ -193,19 +207,30 @@
           <div class="talk"><button id="c-talk">🎙️ Hablar</button><span id="c-heard"></span></div>
           <div class="options" id="c-options"></div>
           <div class="bank hidden" id="bank">
-            <header>🏦 Banco Totalmente Seguro <small>· ficticio</small></header>
-            <div id="b-login">
-              <label for="b-acct">Escribe el nº de cuenta que te dicta el cliente</label>
-              <div class="b-dict" id="b-dict"></div>
-              <div class="b-row"><input id="b-acct" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="········" /><button id="b-enter">Entrar</button></div>
-              <div class="timer"><i id="b-timer"></i></div>
+            <div class="tabs"><button id="t-pc" class="on">🖥️ PC de <span id="t-name"></span></button><button id="t-bank">🏦 Banco</button></div>
+            <div id="pc">
+              <div class="pc-head">Escritorio remoto conectado · busca la contraseña del banco</div>
+              <div class="pc-icons" id="pc-icons"></div>
+              <div class="pc-file hidden" id="pc-file"><div class="pc-fbar"><b id="pc-fname"></b><button id="pc-close">✕</button></div><pre id="pc-ftext"></pre></div>
             </div>
-            <div id="b-account" class="hidden">
-              <div>Titular: <b id="b-owner"></b></div>
-              <div class="b-bal" id="b-bal"></div>
-              <div class="b-extra" id="b-extra"></div>
-              <button id="b-empty">💸 Vaciar cuenta</button>
+            <div id="bankpane" class="hidden">
+              <header>🏦 Banco Totalmente Seguro <small>· ficticio</small></header>
+              <div id="b-login">
+                <label for="b-acct">Nº de cuenta (te lo dicta el cliente)</label>
+                <div class="b-dict" id="b-dict"></div>
+                <input id="b-acct" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="········" />
+                <label for="b-pass">Contraseña (búscala en su PC)</label>
+                <input id="b-pass" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="contraseña" />
+                <button id="b-enter">Entrar</button>
+              </div>
+              <div id="b-account" class="hidden">
+                <div>Titular: <b id="b-owner"></b></div>
+                <div class="b-bal" id="b-bal"></div>
+                <div class="b-extra" id="b-extra"></div>
+                <button id="b-empty">💸 Vaciar cuenta</button>
+              </div>
             </div>
+            <div class="timer"><i id="b-timer"></i></div>
             <div class="b-msg" id="b-msg"></div>
           </div>
           <div class="result hidden" id="c-result"></div>

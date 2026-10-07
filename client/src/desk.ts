@@ -1,11 +1,21 @@
 import { audioFile, reactionFor, SILENCE_REPLY, TRUST_DEAL, TRUST_START, TRUST_WIN, type CallDef } from "./calls";
 import { CAST } from "./config";
-import { audioCtx, sfx } from "./audio";
+import { audioCtx, sfx, SILENT_AUDIO } from "./audio";
 import { faceFile } from "./characters";
 import { matchOption, VoiceInput } from "./voice";
+import { speak, stopSpeaking, type VoiceStyle } from "./tts";
+
+/** Una frase: su audio grabado y, si no existe, el texto que lee la voz del navegador. */
+interface Line {
+  file: string;
+  text: string;
+  voice: VoiceStyle;
+  who: string;
+}
+const PLAYER_VOICE: VoiceStyle = { pitch: 1, rate: 1.1 };
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
-const ROUND_MS = 10000;
+const ROUND_MS = 25000; // tiempo para contestar en cada ronda
 
 // Escritorio dentro del juego: ventana de llamada, tu cámara y el medidor de tu voz.
 // La webcam y el micrófono solo se activan si el jugador pulsa el botón.
@@ -22,7 +32,8 @@ export class DeskUI {
   private micStream: MediaStream | null = null;
   private meterTimer = 0;
   private clockTimer = 0;
-  private audioEl: HTMLAudioElement | null = null;
+  // un único reproductor: en iPhone solo suena lo que reutiliza un elemento ya «desbloqueado» con un toque
+  private player = new Audio();
   private voice = new VoiceInput();
   /** Lo que hacer con una frase oída por voz en la ronda actual (también lo usa la prueba de humo). */
   heard: (text: string) => void = () => {};
@@ -76,8 +87,10 @@ export class DeskUI {
     this.setTalk(false, VoiceInput.supported() ? "" : "Tu navegador no reconoce la voz: usa Chrome, Edge o Safari.");
     $<HTMLButtonElement>("c-talk").disabled = true; // hasta que el cliente conteste
 
+    this.unlockAudio(); // la llamada empieza con un toque o tecla
     this.current = call;
     this.roundIdx = 0;
+    const client = (key: string, text: string): Line => ({ file: audioFile(call.id, key), text, voice: call.voice, who: call.id });
     let trust = TRUST_START;
     const showTrust = () => {
       const bar = $("c-trust");
@@ -117,7 +130,7 @@ export class DeskUI {
         const rep = $("c-reply");
         rep.classList.remove("hidden");
         rep.textContent = call.react[key];
-        void this.playSeq([audioFile(call.id, key)]);
+        void this.playSeq([client(key, call.react[key])]);
         $("c-talk").parentElement!.classList.add("hidden");
         if (deal) {
           sfx.done();
@@ -147,7 +160,8 @@ export class DeskUI {
         };
       };
 
-      const pick = (k: number | null) => {
+      // byVoice: si el jugador ya ha dicho la frase con el micro, no se repite su grabación
+      const pick = (k: number | null, byVoice = false) => {
         if (locked) return;
         locked = true;
         clearInterval(timer);
@@ -165,7 +179,14 @@ export class DeskUI {
         rep.textContent = react ? call.react[react] : SILENCE_REPLY.text;
         delta >= 20 ? sfx.good() : delta > 0 ? sfx.ok() : sfx.bad();
         // primero lo que dice el empleado, después la reacción del cliente
-        const said = this.playSeq(react && k !== null ? [audioFile(call.id, `r${n}_op${k + 1}_jugador`), audioFile(call.id, react)] : [SILENCE_REPLY.audio]);
+        const said = this.playSeq(
+          opt && react && k !== null
+            ? [
+                ...(byVoice ? [] : [{ file: audioFile(call.id, `r${n}_op${k + 1}_jugador`), text: alias(opt.t), voice: PLAYER_VOICE, who: who.name }]),
+                client(react, call.react[react]),
+              ]
+            : [{ file: SILENCE_REPLY.audio, text: SILENCE_REPLY.text, voice: call.voice, who: call.id }],
+        );
         [...$("c-options").children].forEach((b, i) => {
           (b as HTMLButtonElement).disabled = true;
           if (i === k) b.classList.add(delta >= 20 ? "good" : delta > 0 ? "meh" : "bad");
@@ -186,7 +207,7 @@ export class DeskUI {
         const rd = call.rounds[this.roundIdx];
         $("c-reply").classList.add("hidden");
         $("c-say").textContent = `“${alias(rd.say)}”`;
-        void this.playSeq([audioFile(call.id, `r${n}_cliente`)]);
+        void this.playSeq([client(`r${n}_cliente`, alias(rd.say))]);
         this.talk(true);
         const opts = $("c-options");
         opts.innerHTML = "";
@@ -194,7 +215,10 @@ export class DeskUI {
           const b = document.createElement("button");
           b.innerHTML = `<kbd>${i + 1}</kbd> `;
           b.append(alias(o.t));
-          b.onclick = () => pick(i);
+          b.onclick = () => {
+            this.unlockAudio();
+            pick(i);
+          };
           opts.appendChild(b);
         });
         startAt = performance.now();
@@ -208,7 +232,7 @@ export class DeskUI {
         this.heard = (heard) => {
           const i = matchOption(heard, texts);
           $("c-heard").textContent = i >= 0 ? `Has dicho: «${heard}»` : `No te he entendido: «${heard}». Repite o toca la frase.`;
-          if (i >= 0) pick(i);
+          if (i >= 0) pick(i, true);
         };
         $<HTMLButtonElement>("c-talk").disabled = !VoiceInput.supported();
         this.onKey = (e) => {
@@ -235,33 +259,74 @@ export class DeskUI {
   }
 
   /** Reproduce los audios en orden; termina al acabar el último. Si falta un archivo, se lo salta. */
-  private async playSeq(urls: string[]) {
+  /** Reproduce las frases en orden; si falta la grabación, la lee la voz del navegador. */
+  private async playSeq(lines: Line[]) {
     this.stopAudio();
-    for (const url of urls) {
-      const el = new Audio(`audio/calls/${url}`);
-      this.audioEl = el;
-      await new Promise<void>((resolve) => {
-        el.onended = el.onerror = el.onpause = () => resolve();
-        el.play().catch(() => resolve());
+    const seq = ++this.seq;
+    const el = this.player;
+    for (const line of lines) {
+      el.src = `audio/calls/${line.file}`;
+      const recorded = await new Promise<boolean>((resolve) => {
+        this.cancelLine = () => resolve(true); // stopAudio() la da por terminada
+        el.onended = el.onpause = () => resolve(true);
+        el.onerror = () => resolve(false);
+        el.play().catch(() => resolve(false));
       });
-      if (this.audioEl !== el) return; // la cortó otro audio o se colgó la llamada
+      if (seq !== this.seq) return; // la cortó otra frase o se colgó la llamada
+      if (!recorded) await speak(line.text, line.voice, line.who);
+      if (seq !== this.seq) return;
     }
   }
 
-  // Banco: el cliente dicta su cuenta, la escribes a tiempo y la vacías. Devuelve si se vació.
+  // Escritorio remoto + banco: el cliente dicta su cuenta, buscas la contraseña en su PC y la vacías.
+  // Devuelve si se vació.
   private openBank(call: CallDef): Promise<boolean> {
-    const BANK_MS = 20000;
+    const BANK_MS = 60000;
     const code = Array.from({ length: 8 }, () => Math.floor(Math.random() * 10)).join("");
     this.bankCode = code;
-    const input = $<HTMLInputElement>("b-acct");
+    const acct = $<HTMLInputElement>("b-acct");
+    const pass = $<HTMLInputElement>("b-pass");
     const msg = $("b-msg");
     $("bank").classList.remove("hidden");
     $("b-login").classList.remove("hidden");
     $("b-account").classList.add("hidden");
     $("b-dict").textContent = `«${code.slice(0, 4)} ${code.slice(4)}»`;
-    input.value = "";
-    msg.textContent = "";
-    window.setTimeout(() => input.focus(), 50);
+    $("t-name").textContent = call.customer.split(",")[0];
+    acct.value = pass.value = "";
+    msg.textContent = "Busca la contraseña en su PC y entra en el banco.";
+
+    // pestañas
+    const tab = (which: "pc" | "bank") => {
+      $("pc").classList.toggle("hidden", which !== "pc");
+      $("bankpane").classList.toggle("hidden", which !== "bank");
+      $("t-pc").classList.toggle("on", which === "pc");
+      $("t-bank").classList.toggle("on", which === "bank");
+      if (which === "bank") window.setTimeout(() => (acct.value ? pass : acct).focus(), 50);
+    };
+    $("t-pc").onclick = () => tab("pc");
+    $("t-bank").onclick = () => tab("bank");
+    tab("pc");
+
+    // escritorio de la víctima
+    const icons = $("pc-icons");
+    icons.innerHTML = "";
+    $("pc-file").classList.add("hidden");
+    for (const f of call.pc.files) {
+      const b = document.createElement("button");
+      const ic = document.createElement("span");
+      ic.textContent = f.icon;
+      b.append(ic, f.name);
+      b.onclick = () => {
+        b.classList.add("seen");
+        $("pc-fname").textContent = `${f.icon} ${f.name}`;
+        $("pc-ftext").textContent = f.text;
+        $("pc-file").classList.remove("hidden");
+      };
+      icons.appendChild(b);
+    }
+    $("pc-close").onclick = () => $("pc-file").classList.add("hidden");
+
+    const norm = (t: string) => t.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/\s+/g, "");
     return new Promise((resolve) => {
       let tries = 3;
       let done = false;
@@ -269,7 +334,7 @@ export class DeskUI {
       const timer = window.setInterval(() => {
         const f = 1 - (performance.now() - startAt) / BANK_MS;
         $("b-timer").style.width = `${Math.max(0, f * 100)}%`;
-        if (f <= 0) fail("⏰ Se acabó el tiempo. El cliente se ha ido a cenar.");
+        if (f <= 0) fail("⏰ Se acabó el tiempo. El cliente ha apagado el ordenador.");
       }, 100);
       const fail = (text: string) => {
         if (done) return;
@@ -279,29 +344,38 @@ export class DeskUI {
         sfx.bad();
         window.setTimeout(() => resolve(false), 1800);
       };
+      const shake = (el: HTMLElement) => {
+        el.classList.remove("shake");
+        void el.offsetWidth;
+        el.classList.add("shake");
+      };
       const enter = () => {
         if (done) return;
-        if (input.value.replace(/\D/g, "") === code) {
+        const okAcct = acct.value.replace(/\D/g, "") === code;
+        const okPass = norm(pass.value) === norm(call.pc.password);
+        if (okAcct && okPass) {
           clearInterval(timer);
           showAccount();
           return;
         }
         tries--;
-        input.classList.remove("shake");
-        void input.offsetWidth;
-        input.classList.add("shake");
+        if (!okAcct) shake(acct);
+        if (!okPass) shake(pass);
+        const what = !okAcct && !okPass ? "Cuenta y contraseña incorrectas" : !okAcct ? "Número de cuenta incorrecto" : "Contraseña incorrecta";
         if (tries <= 0) fail("🚫 Demasiados intentos. El banco ha bloqueado la cuenta.");
-        else msg.textContent = `Número incorrecto. Te quedan ${tries} intentos.`;
+        else msg.textContent = `${what}. Te quedan ${tries} intentos.`;
       };
       $("b-enter").onclick = enter;
+      acct.onkeydown = (e) => e.key === "Enter" && pass.focus();
+      pass.onkeydown = (e) => e.key === "Enter" && enter();
       this.onKey = (e) => {
         if (e.key === "Escape") fail("Has colgado sin vaciar la cuenta.");
       };
-      input.onkeydown = (e) => e.key === "Enter" && enter();
 
       const money = (n: number) => n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " $";
       const showAccount = () => {
         sfx.good();
+        tab("bank");
         $("b-login").classList.add("hidden");
         $("b-account").classList.remove("hidden");
         $("b-owner").textContent = call.customer;
@@ -336,6 +410,7 @@ export class DeskUI {
 
   // «Hablar»: escucha una frase y elige la opción que más se parece
   private talkOnce() {
+    this.unlockAudio();
     if (this.voice.listening) {
       this.voice.stop();
       this.setTalk(false);
@@ -358,9 +433,29 @@ export class DeskUI {
     if (msg !== undefined) $("c-heard").textContent = msg;
   }
 
+  private seq = 0;
+  private cancelLine = () => {};
+
+  /** Llamar dentro de un toque o clic: deja el sonido y la voz del navegador listos para después. */
+  private unlockAudio() {
+    const el = this.player;
+    if (el.paused) {
+      el.src = SILENT_AUDIO;
+      void el.play().catch(() => {});
+    }
+    try {
+      speechSynthesis.speak(new SpeechSynthesisUtterance(""));
+    } catch {
+      /* sin voz del navegador */
+    }
+  }
+
   private stopAudio() {
-    this.audioEl?.pause();
-    this.audioEl = null;
+    this.seq++;
+    stopSpeaking();
+    this.player.onended = this.player.onpause = this.player.onerror = null;
+    this.player.pause();
+    this.cancelLine();
   }
 
   private async toggleCam() {
