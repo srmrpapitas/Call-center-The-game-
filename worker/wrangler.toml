@@ -1,0 +1,15 @@
+name = "call-center-server"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+# Sirve también el cliente web compilado (client/dist) desde el mismo Worker.
+[assets]
+directory = "../client/dist"
+
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "Room"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room"]

@@ -1,0 +1,29 @@
+# Despliega el Worker (y el cliente web) en Cloudflare al hacer push a main.
+# Requiere los secretos CLOUDFLARE_API_TOKEN y CLOUDFLARE_ACCOUNT_ID en el repositorio.
+name: Deploy servidor
+on:
+  push:
+    branches: [main]
+    paths: ["client/**", "worker/**", ".github/workflows/deploy-server.yml"]
+  workflow_dispatch:
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      HAS_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Compilar cliente web
+        if: env.HAS_TOKEN == 'true'
+        run: cd client && npm install && npm run build
+      - name: Desplegar en Cloudflare
+        if: env.HAS_TOKEN == 'true'
+        run: cd worker && npm install && npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Aviso
+        if: env.HAS_TOKEN != 'true'
+        run: echo "Sin CLOUDFLARE_API_TOKEN: despliegue omitido."
