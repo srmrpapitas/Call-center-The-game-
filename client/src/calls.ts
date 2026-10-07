@@ -217,6 +217,134 @@ export const CALLS: CallDef[] = [
       },
     ],
   },
+  {
+    id: "medusa",
+    customer: "Doña Medusa",
+    emoji: "🐍",
+    product: "Espejos Antirreflejo",
+    rounds: [
+      {
+        say: "Sssí, ¿quién es? Y no me mire, que es peor.",
+        options: [
+          { t: "¡No la miro, se lo prometo! Llamo justo por eso: espejos que no devuelven la mirada.", pts: 3, reply: "Sssugerente." },
+          { t: "Tengo una oferta que le dejará de piedra.", pts: 1, reply: "Eso lo hago yo, querido." },
+          { t: "¿Puede activar la videollamada?", pts: 0, reply: "Usted no aprende, ¿eh?" },
+        ],
+      },
+      {
+        say: "Mi último peluquero acabó de estatua. ¿Y los espejos?",
+        options: [
+          { t: "Irrompibles, y con garantía de que ninguno sale petrificado.", pts: 3, reply: "Por fin un poco de seguridad laboral." },
+          { t: "Son espejos normales, pero más caros.", pts: 1, reply: "Qué sinceridad tan poco comercial." },
+          { t: "Su peluquero no estará en nuestra base de clientes, ¿no?", pts: 0, reply: "Está en mi jardín." },
+        ],
+      },
+      {
+        say: "¿Y si me canso de ellos?",
+        options: [
+          { t: "Los decora usted con sus serpientes. Edición limitada.", pts: 3, reply: "Mis niñas estarán encantadas. Trato." },
+          { t: "Tiene catorce días para devolverlos.", pts: 1, reply: "El mensajero no sobrevivirá." },
+          { t: "Pues los tira, como todo el mundo.", pts: 0, reply: "Sssin alma." },
+        ],
+      },
+    ],
+  },
+  {
+    id: "barbanegra",
+    customer: "Capitán Barbanegra",
+    emoji: "🏴‍☠️",
+    product: "GPS para Tesoros Enterrados",
+    rounds: [
+      {
+        say: "¡Arrr! ¿Quién se atreve a llamar a mi loro?",
+        options: [
+          { t: "Su proveedor oficial de mapas, capitán. Sin la X borrosa.", pts: 3, reply: "¡Arrr! Esa X me trae por la calle de la amargura." },
+          { t: "Un servicio de atención al pirata.", pts: 1, reply: "¿Atención? Yo atiendo a cañonazos." },
+          { t: "Creo que me he equivocado de número.", pts: 0, reply: "¡A la tabla con él!" },
+        ],
+      },
+      {
+        say: "Ya tengo un mapa. Me lo dio un tipo con una pata de palo.",
+        options: [
+          { t: "Ese mapa tiene dos siglos y ninguna actualización. El nuestro avisa de los tiburones.", pts: 3, reply: "Los tiburones me deben un brazo..." },
+          { t: "El nuestro es más bonito.", pts: 1, reply: "La belleza no da doblones." },
+          { t: "¿Seguro que no es un mapa del metro?", pts: 0, reply: "¡Arrr, insolente!" },
+        ],
+      },
+      {
+        say: "¿Cuánto me cuesta?",
+        options: [
+          { t: "Un 10 % del tesoro que encuentre. Si no encuentra nada, no paga... casi.", pts: 3, reply: "¡Trato hecho, grumete!" },
+          { t: "Tenemos planes desde 29,99 al mes.", pts: 1, reply: "¿Mes? Yo cuento en mareas." },
+          { t: "Solo aceptamos tarjeta, nada de oro.", pts: 0, reply: "¡Pues hundan su barco!" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "manolo",
+    customer: "Manolo el Zombi",
+    emoji: "🧟",
+    product: "Plan de Dieta Sin Cerebros",
+    rounds: [
+      {
+        say: "Ceeerebrooos... digo, ¿diga?",
+        options: [
+          { t: "¡Manolo! Le llamo para ayudarle a dejar ese mal hábito.", pts: 3, reply: "Llevo siglos intentándolo, uuugh." },
+          { t: "Le ofrezco un plan de alimentación.", pts: 1, reply: "¿Lleva... cerebros?" },
+          { t: "Uy, qué voz más rara tiene usted.", pts: 0, reply: "Se me cayó la mandíbula. Literal." },
+        ],
+      },
+      {
+        say: "¿Y qué voy a comer, entonces?",
+        options: [
+          { t: "Coliflor. Tiene la misma forma y cero remordimientos.", pts: 3, reply: "Coliflor... qué idea más brillante." },
+          { t: "Ensaladas variadas.", pts: 1, reply: "Las ensaladas no corren. Qué aburrido." },
+          { t: "Lo que quiera, menos a mí.", pts: 0, reply: "Ya veremos." },
+        ],
+      },
+      {
+        say: "¿Y si me cuesta seguirlo?",
+        options: [
+          { t: "Incluye un coach motivacional que, por contrato, ya no tiene cerebro que perder.", pts: 3, reply: "Me apunto, uuugh." },
+          { t: "Puede pedir ayuda a su médico.", pts: 1, reply: "Me lo comí en 1987." },
+          { t: "Pues no se apunte.", pts: 0, reply: "Uuugh. Grosero." },
+        ],
+      },
+    ],
+  },
+  {
+    id: "bruja",
+    customer: "La Abuela Bruja",
+    emoji: "🧙‍♀️",
+    product: "Escobas Eléctricas",
+    rounds: [
+      {
+        say: "¿Quién es? Tengo el caldero al fuego, sé breve.",
+        options: [
+          { t: "Su asesor de movilidad sostenible, señora. Escobas con batería de litio.", pts: 3, reply: "¿Batería? Como el móvil de mi nieta." },
+          { t: "Alguien que la quiere ayudar.", pts: 1, reply: "Eso decía Hansel." },
+          { t: "Huele a quemado desde aquí.", pts: 0, reply: "Es la cena. Y sobra sitio." },
+        ],
+      },
+      {
+        say: "Mi escoba de paja vuela de maravilla.",
+        options: [
+          { t: "Y ahora con asiento calefactable y GPS para no perderse en la niebla.", pts: 3, reply: "La niebla me tiene harta, sí." },
+          { t: "La nuestra vuela más rápido.", pts: 1, reply: "¿Y para qué tanta prisa?" },
+          { t: "Pues siga con ella, a mí qué.", pts: 0, reply: "Te convertiría en sapo si tuviera tiempo." },
+        ],
+      },
+      {
+        say: "¿Y cómo se carga?",
+        options: [
+          { t: "Con un rayo de luna llena o con un enchufe normal, lo que pille más cerca.", pts: 3, reply: "¡Moderna y tradicional! Me la llevo." },
+          { t: "Viene con un cargador.", pts: 1, reply: "Otro cable más en la cueva." },
+          { t: "No lo sé, nunca he volado.", pts: 0, reply: "Se nota." },
+        ],
+      },
+    ],
+  },
 ];
 
 export function pickCall(last?: string): CallDef {

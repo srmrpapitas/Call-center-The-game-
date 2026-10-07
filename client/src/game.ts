@@ -4,10 +4,14 @@ import { buildWorld, resolveCollisions, type Box, type DeskSpot } from "./world"
 import { Net, type Msg } from "./net";
 import { DeskUI } from "./desk";
 import { pickCall } from "./calls";
-import { CAST, QUOTA_PER_PLAYER, SHIFT_SECONDS } from "./config";
+import { BOSS, BOSS_MAX_SECONDS, BOSS_MIN_SECONDS, BOSS_PENALTY, BOSS_WARN_SECONDS, CAST, QUOTA_PER_PLAYER, SHIFT_SECONDS } from "./config";
 import { sfx, audioCtx } from "./audio";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+
+// Ronda del jefe: sale de su despacho, baja al pasillo central y lo recorre entero.
+const BOSS_PATH = [new THREE.Vector2(7.5, -6.6), new THREE.Vector2(7.5, 0), new THREE.Vector2(-11.5, 0)];
+const BOSS_SPEED = 3; // m/s
 
 interface Remote {
   id: number;
@@ -51,6 +55,10 @@ export class Game {
   private running = false;
   private lastPhase = "";
   private toastTimer = 0;
+  private boss: Avatar;
+  private bossAt = 0; // modo solo: cuándo suena el aviso (0 = no hay ronda pendiente)
+  private bossArrive = 0; // cuándo llega el jefe (0 = sin aviso activo)
+  private bossWalkStart = 0; // >0 mientras recorre la oficina
 
   constructor(private canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -58,6 +66,10 @@ export class Game {
     const w = buildWorld(this.scene);
     this.colliders = w.colliders;
     this.desks = w.desks;
+    this.boss = buildAvatar(BOSS);
+    this.boss.group.scale.setScalar(1.12);
+    this.boss.group.visible = false;
+    this.scene.add(this.boss.group);
     this.resize();
     window.addEventListener("resize", () => this.resize());
     this.bindInput();
@@ -127,7 +139,10 @@ export class Game {
         $("h-room").textContent = `Sala ${o.code}`;
       }
     }
-    if (!this.online) $("h-room").textContent = "Solo";
+    if (!this.online) {
+      $("h-room").textContent = "Solo";
+      this.scheduleBoss();
+    }
     this.running = true;
     this.clock.start();
     $("hud").classList.remove("hidden");
@@ -175,7 +190,11 @@ export class Game {
         if (m.by && m.by !== this.me.id) {
           const r = this.others.get(m.by);
           if (r && m.pts > 0) this.toast(`${r.name} suma +${m.pts} de cuota`);
+          else if (r && m.pts < 0) this.toast(`El jefe ha pillado a ${r.name} de paseo (${m.pts})`);
         }
+        break;
+      case "boss":
+        this.warnBoss(performance.now() + Number(m.in));
         break;
     }
   }
@@ -254,6 +273,7 @@ export class Game {
     this.updateMe(dt, t);
     this.updateOthers(dt, t);
     this.updateTeam();
+    this.updateBoss(t);
     this.updateCamera(dt);
     this.updateHud();
     this.updateTags();
@@ -338,8 +358,81 @@ export class Game {
         this.team.score = 0;
         this.team.win = false;
         this.team.endAt = now + SHIFT_SECONDS * 1000;
+        this.scheduleBoss();
       }
     }
+  }
+
+  // ---------- el jefe ----------
+  private scheduleBoss() {
+    const s = BOSS_MIN_SECONDS + Math.random() * (BOSS_MAX_SECONDS - BOSS_MIN_SECONDS);
+    this.bossAt = performance.now() + s * 1000;
+  }
+
+  private warnBoss(arriveAt: number) {
+    if (this.team.phase !== "shift") return;
+    this.bossArrive = arriveAt;
+    $("boss-alert").classList.remove("hidden");
+    sfx.boss();
+  }
+
+  private clearBoss() {
+    this.bossAt = 0;
+    this.bossArrive = 0;
+    this.bossWalkStart = 0;
+    this.boss.group.visible = false;
+    $("boss-alert").classList.add("hidden");
+  }
+
+  // Al llegar, quien no esté sentado atendiendo una llamada pierde cuota.
+  private inspect() {
+    $("boss-alert").classList.add("hidden");
+    this.bossWalkStart = performance.now();
+    this.boss.group.visible = true;
+    if (this.seated) {
+      this.toast(`${BOSS.name} pasa por detrás… y asiente. Te has librado.`);
+      return;
+    }
+    sfx.bad();
+    this.toast(`¡${BOSS.name} te ha pillado de paseo! −${BOSS_PENALTY} de cuota`);
+    if (this.online) this.net.send({ t: "caught" });
+    else this.team.score = Math.max(0, this.team.score - BOSS_PENALTY);
+  }
+
+  private updateBoss(t: number) {
+    const now = performance.now();
+    if (!this.online && this.bossAt && now >= this.bossAt) {
+      this.bossAt = 0;
+      this.warnBoss(now + BOSS_WARN_SECONDS * 1000);
+    }
+    if (this.bossArrive) {
+      const left = Math.ceil((this.bossArrive - now) / 1000);
+      if (left > 0) {
+        $("boss-alert").textContent = `🚨 ¡Viene ${BOSS.name}! Siéntate en un puesto: ${left} s`;
+      } else {
+        this.bossArrive = 0;
+        this.inspect();
+      }
+    }
+    if (!this.bossWalkStart) return;
+    // avanzar por el recorrido según la distancia andada
+    let d = ((now - this.bossWalkStart) / 1000) * BOSS_SPEED;
+    const g = this.boss.group;
+    for (let i = 1; i < BOSS_PATH.length; i++) {
+      const a = BOSS_PATH[i - 1];
+      const b = BOSS_PATH[i];
+      const len = a.distanceTo(b);
+      if (d <= len) {
+        const f = d / len;
+        g.position.set(a.x + (b.x - a.x) * f, 0, a.y + (b.y - a.y) * f);
+        g.rotation.y = Math.atan2(b.x - a.x, b.y - a.y);
+        animateAvatar(this.boss, t, true);
+        return;
+      }
+      d -= len;
+    }
+    this.bossWalkStart = 0;
+    g.visible = false;
   }
 
   private updateCamera(dt: number) {
@@ -385,6 +478,7 @@ export class Game {
       this.lastPhase = this.team.phase;
       const end = $("end");
       if (this.team.phase === "over") {
+        this.clearBoss();
         end.classList.remove("hidden");
         $("end-title").textContent = this.team.win ? "¡Cuota cumplida!" : "Revisión del jefe: estáis despedidos";
         $("end-text").textContent = this.team.win

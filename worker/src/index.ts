@@ -9,6 +9,11 @@ const MAX_PLAYERS = 4;
 const SHIFT_MS = 240_000; // duración del turno
 const OVER_MS = 15_000; // pausa entre turnos
 const QUOTA_PER_PLAYER = 30;
+// Evento del jefe (mismos valores que client/src/config.ts)
+const BOSS_MIN_MS = 60_000;
+const BOSS_MAX_MS = 180_000;
+const BOSS_WARN_MS = 8_000;
+const BOSS_PENALTY = 5;
 
 type Player = {
   id: number;
@@ -42,6 +47,9 @@ export class Room implements DurableObject {
   private score = 0;
   private phase: "shift" | "over" = "shift";
   private phaseEnd = 0;
+  private bossAt = 0; // cuándo se avisa de la ronda del jefe (0 = ya hecha)
+  private bossArrive = 0; // cuándo llega el jefe
+  private caught = new Set<number>(); // jugadores ya penalizados en esta ronda
 
   constructor(private state: DurableObjectState, _env: Env) {}
 
@@ -141,6 +149,14 @@ export class Room implements DurableObject {
       const pts = Math.max(0, Math.min(9, Number(msg.pts) | 0));
       this.score += pts;
       this.broadcast({ ...this.teamMsg(), by: p.id, pts });
+    } else if (msg.t === "caught" && this.phase === "shift") {
+      // cada cliente comprueba si su jugador estaba sentado; aquí solo se valida la ventana
+      const now = Date.now();
+      if (!this.bossArrive || now < this.bossArrive - 2000 || now > this.bossArrive + 5000) return;
+      if (this.caught.has(p.id)) return;
+      this.caught.add(p.id);
+      this.score = Math.max(0, this.score - BOSS_PENALTY);
+      this.broadcast({ ...this.teamMsg(), by: p.id, pts: -BOSS_PENALTY });
     }
   }
 
@@ -161,11 +177,22 @@ export class Room implements DurableObject {
     this.phase = "shift";
     this.score = 0;
     this.phaseEnd = Date.now() + SHIFT_MS;
-    await this.state.storage.setAlarm(this.phaseEnd);
+    this.bossAt = Date.now() + BOSS_MIN_MS + Math.random() * (BOSS_MAX_MS - BOSS_MIN_MS);
+    this.bossArrive = 0;
+    this.caught.clear();
+    await this.state.storage.setAlarm(this.bossAt);
   }
 
   async alarm() {
     if (this.players.size === 0) return;
+    if (this.phase === "shift" && this.bossAt && Date.now() < this.phaseEnd) {
+      // primero la ronda del jefe; después, el final del turno
+      this.bossAt = 0;
+      this.bossArrive = Date.now() + BOSS_WARN_MS;
+      this.broadcast({ t: "boss", in: BOSS_WARN_MS });
+      await this.state.storage.setAlarm(this.phaseEnd);
+      return;
+    }
     if (this.phase === "shift") {
       this.phase = "over";
       this.phaseEnd = Date.now() + OVER_MS;

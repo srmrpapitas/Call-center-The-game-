@@ -106,6 +106,21 @@ try {
   await sleep(1000);
   note((await S.page.textContent("#h-room")).trim() === "Solo", "Modo solo funciona");
   await S.page.screenshot({ path: `${OUT}/07-solo.png` });
+
+  // ---- Ronda del jefe (forzada): de pie se pierde cuota ----
+  await S.page.evaluate(() => {
+    const g = window.__game;
+    g.team.score = 10;
+    g.warnBoss(performance.now() + 1500);
+  });
+  await sleep(500);
+  note(await S.page.isVisible("#boss-alert"), "Aparece el aviso de que viene el jefe");
+  await S.page.screenshot({ path: `${OUT}/08-aviso-jefe.png` });
+  await sleep(2000);
+  const bossScore = await S.page.evaluate(() => window.__game.team.score);
+  const bossToast = (await S.page.textContent("#toast")).trim();
+  note(bossScore === 5 && /pillado/.test(bossToast), `El jefe pilla al jugador de pie (cuota 10 -> ${bossScore}: ${bossToast})`);
+  await S.page.screenshot({ path: `${OUT}/09-jefe-paseando.png` });
 } catch (e) {
   note(false, `Excepción: ${String(e).slice(0, 300)}`);
 }

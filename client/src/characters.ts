@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { CAST } from "./config";
+import { CAST, type CastDef } from "./config";
 
 const mat = (c: number) => new THREE.MeshLambertMaterial({ color: c, flatShading: true });
 
@@ -20,8 +20,8 @@ function limb(w: number, h: number, d: number, m: THREE.Material, x: number, y: 
   return mesh;
 }
 
-export function buildAvatar(idx: number): Avatar {
-  const d = CAST[((idx % CAST.length) + CAST.length) % CAST.length];
+export function buildAvatar(look: number | CastDef): Avatar {
+  const d = typeof look === "number" ? CAST[((look % CAST.length) + CAST.length) % CAST.length] : look;
   const group = new THREE.Group();
   const body = new THREE.Group();
   group.add(body);

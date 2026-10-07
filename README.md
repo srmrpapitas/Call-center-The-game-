@@ -24,6 +24,8 @@ npm --prefix client run build
 npm run dev:server            # http://localhost:8787  (sirve también el cliente)
 ```
 
+**El jefe:** una vez por turno, Don Bonifacio sale de Dirección y recorre la oficina. Suena una alarma y tenéis 8 segundos para sentaros en un puesto; quien le pille de pie resta 5 de cuota al equipo.
+
 Controles: `WASD` mover · `Mayús` correr · arrastrar ratón: cámara · rueda: zoom · `E` en un puesto para atender una llamada · `1/2/3` para responder · `Esc` levantarse.
 
 ## Coste cero
@@ -52,4 +54,4 @@ Mira `client/public/audio/calls/README.md`. Cada línea de `client/src/calls.ts`
 - Voz entre jugadores (WebRTC) y que tu voz llegue a la llamada.
 - Clientes con IA en tiempo real (opcional, tiene coste).
 - Modelos propios (`.glb`) para los personajes y la oficina.
-- Evento del jefe, tienda de mejoras y más llamadas.
+- Tienda de mejoras y más llamadas.
