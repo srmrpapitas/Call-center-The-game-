@@ -28,6 +28,7 @@ export interface CallDef {
   scam: string; // el timo de la llamada
   rounds: CallRound[];
   react: Record<Reaction, string>;
+  bank: { balance: number; extra: string }; // lo que hay en su cuenta (balance 0 = cuenta trampa)
 }
 
 export const TRUST_START = 25;
@@ -88,6 +89,7 @@ export const CALLS: CallDef[] = [
       trato: "Espera, que busco las gafas… La tarjeta empieza por 4… ¿Quieres también el PIN, cariño?",
       cuelga: "Voy a llamar a Timmy. Al de verdad.",
     },
+    bank: { balance: 3214.5, extra: "+ 14 caramelos de menta en la caja fuerte" },
   },
   {
     id: "gary",
@@ -129,6 +131,7 @@ export const CALLS: CallDef[] = [
       trato: "Apunta rápido, que nos escuchan: el número de cuenta es…",
       cuelga: "Me voy al búnker. No vuelvas a llamar.",
     },
+    bank: { balance: 48210, extra: "+ 3 lingotes enterrados en el jardín (no declarados)" },
   },
   {
     id: "karen",
@@ -170,6 +173,7 @@ export const CALLS: CallDef[] = [
       trato: "Apunta. Y que conste que lo hago porque soy muy razonable.",
       cuelga: "Una estrella. Y te denuncio en Facebook.",
     },
+    bank: { balance: 15999.99, extra: "+ un vale para 40 velas aromáticas" },
   },
   {
     id: "herbert",
@@ -211,6 +215,7 @@ export const CALLS: CallDef[] = [
       trato: "Le doy mi cuenta, joven. Y si el príncipe quiere, que venga a cenar el domingo.",
       cuelga: "Me voy a ver la tele. Al menos ella no me pide nada.",
     },
+    bank: { balance: 27650, extra: "+ la pensión de Martha, que nadie ha dado de baja" },
   },
   {
     id: "bob",
@@ -252,6 +257,7 @@ export const CALLS: CallDef[] = [
       trato: "Ahí va: cero, cero, cero, cero… Caduca nunca. ¡Trato hecho! (El jefe no lo comprueba.)",
       cuelga: "Gracias por los cuarenta minutos. Suscríbete al canal.",
     },
+    bank: { balance: 0, extra: "Mensaje del banco: «Hola, soy Bob. Saluda a la cámara 👋»" },
   },
   {
     id: "brenda",
@@ -293,6 +299,7 @@ export const CALLS: CallDef[] = [
       trato: "¡Chat, apuntad conmigo! El número de cuenta es…",
       cuelga: "Me voy a hacer un directo llorando por esto.",
     },
+    bank: { balance: 912.3, extra: "+ 3 millones de seguidores comprados" },
   },
 ];
 

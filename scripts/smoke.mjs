@@ -90,7 +90,7 @@ try {
       // por voz: se simula que el reconocimiento oye la frase leída
       await A.page.evaluate((k) => {
         const ui = window.__game.ui;
-        ui.voice.onHeard(document.querySelectorAll("#c-options button")[k].textContent.slice(2));
+        ui.heard(document.querySelectorAll("#c-options button")[k].textContent.slice(2));
       }, best);
     } else if (i === 1) await A.page.click(`#c-options button:nth-child(${best + 1})`);
     else await A.page.keyboard.press(String(best + 1));
@@ -98,15 +98,25 @@ try {
     await A.page.waitForFunction(
       (n) =>
         !document.querySelector("#c-result").classList.contains("hidden") ||
+        !document.querySelector("#bank").classList.contains("hidden") ||
         (window.__game.ui.roundIdx === n && document.querySelectorAll("#c-options button:not([disabled])").length === 3),
       i + 1,
       { timeout: 40000 },
     );
   }
-  await sleep(500);
+  // banco: escribir el nº de cuenta que dicta el cliente y vaciarla
+  await A.page.waitForSelector("#bank:not(.hidden)", { timeout: 40000 });
+  const code = await A.page.evaluate(() => window.__game.ui.bankCode);
+  await A.page.fill("#b-acct", code);
+  await A.page.click("#b-enter");
+  await A.page.waitForSelector("#b-account:not(.hidden)", { timeout: 5000 });
+  await A.page.screenshot({ path: `${OUT}/05-banco.png` });
+  await A.page.click("#b-empty");
+  await A.page.waitForSelector("#c-result:not(.hidden)", { timeout: 15000 });
+  await sleep(300);
   await A.page.screenshot({ path: `${OUT}/05-resultado.png` });
   const result = (await A.page.textContent("#c-result")).replace(/\s+/g, " ").trim();
-  note(/TRATO CERRADO.*puntos de cuota/.test(result), `Trato cerrado respondiendo con voz, clic y tecla: ${result.slice(0, 80)}`);
+  note(/(CUENTA VACIADA|TRATO CERRADO).*puntos de cuota/.test(result), `Trato cerrado y banco (voz, clic y tecla): ${result.slice(0, 80)}`);
   await A.page.keyboard.press("Enter");
   await sleep(1500);
   const scoreA = await A.page.textContent("#h-score");

@@ -1,5 +1,6 @@
-// Responder con la voz: el jugador lee en voz alta una de las tres frases y se elige la que más se
-// parece. Usa el reconocimiento de voz del navegador (Chrome y Edge; el audio lo procesa su servicio).
+// Responder con la voz: el jugador pulsa «Hablar», lee una de las tres frases y se elige la que más
+// se parece. Usa el reconocimiento de voz del navegador (Chrome, Edge y Safari; el audio lo procesa
+// el servicio del navegador). Escucha una frase por pulsación, que es lo que mejor va en el móvil.
 
 const words = (s: string) =>
   s
@@ -14,7 +15,7 @@ const NUMBERS: Record<string, number> = { uno: 0, "1": 0, dos: 1, "2": 1, tres: 
 
 /** Índice de la frase que más se parece a lo que se ha oído, o -1 si no está claro. */
 export function matchOption(heard: string, options: string[]): number {
-  const said = heard.trim().toLowerCase().replace(/^(la |opcion |opción )/, "");
+  const said = heard.trim().toLowerCase().replace(/[.!?¡¿]/g, "").replace(/^(la |opcion |opción )/, "");
   if (said in NUMBERS) return NUMBERS[said];
   const got = new Set(words(heard));
   const scores = options.map((o) => {
@@ -26,66 +27,61 @@ export function matchOption(heard: string, options: string[]): number {
   return best >= 0.3 && best - second >= 0.1 ? scores.indexOf(best) : -1;
 }
 
-type Rec = {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  onresult: ((e: any) => void) | null;
-  onend: (() => void) | null;
-  onerror: ((e: any) => void) | null;
-  start(): void;
-  stop(): void;
+const ERRORS: Record<string, string> = {
+  "not-allowed": "Sin permiso para el micrófono: permítelo en el navegador.",
+  "service-not-allowed": "El navegador no deja usar la voz. En iPhone: Ajustes › General › Teclado › Activar dictado.",
+  "no-speech": "No te he oído. Toca «Hablar» y habla más cerca.",
+  "audio-capture": "No encuentro el micrófono.",
+  network: "El reconocimiento de voz necesita conexión.",
 };
 
 export class VoiceInput {
-  private rec: Rec | null = null;
-  private wanted = false;
-  onHeard: (text: string) => void = () => {};
-  onError: (msg: string) => void = () => {};
+  private rec: any = null;
 
   static supported(): boolean {
     return !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
   }
 
-  start() {
+  /** Escucha una frase. `onPartial` recibe lo que va entendiendo; la promesa da el texto final. */
+  listenOnce(onPartial: (text: string) => void): Promise<string> {
     const Ctor = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!Ctor || this.wanted) return;
-    this.wanted = true;
-    const rec: Rec = new Ctor();
-    rec.lang = "es-ES";
-    rec.continuous = true;
-    rec.interimResults = false;
-    rec.onresult = (e) => {
-      const r = e.results[e.results.length - 1];
-      if (r.isFinal) this.onHeard(r[0].transcript);
-    };
-    rec.onerror = (e) => {
-      if (e.error === "not-allowed" || e.error === "service-not-allowed") {
-        this.wanted = false;
-        this.onError("Sin permiso para el micrófono");
+    if (!Ctor) return Promise.reject(new Error("Tu navegador no reconoce la voz: usa Chrome, Edge o Safari."));
+    this.stop();
+    return new Promise((resolve, reject) => {
+      const rec = new Ctor();
+      this.rec = rec;
+      rec.lang = "es-ES";
+      rec.continuous = false;
+      rec.interimResults = true;
+      let text = "";
+      rec.onresult = (e: any) => {
+        text = Array.from(e.results as ArrayLike<any>, (r) => r[0].transcript).join(" ");
+        onPartial(text);
+      };
+      rec.onerror = (e: any) => reject(new Error(ERRORS[e.error] ?? `Error de voz: ${e.error}`));
+      rec.onend = () => {
+        if (this.rec === rec) this.rec = null;
+        if (text) resolve(text);
+        else reject(new Error(ERRORS["no-speech"]));
+      };
+      try {
+        rec.start();
+      } catch {
+        reject(new Error("No se ha podido empezar a escuchar."));
       }
-    };
-    // el navegador corta tras un rato de silencio: se vuelve a arrancar mientras esté activo
-    rec.onend = () => {
-      if (this.wanted) {
-        try {
-          rec.start();
-        } catch {
-          /* ya estaba arrancado */
-        }
-      }
-    };
-    this.rec = rec;
-    try {
-      rec.start();
-    } catch {
-      /* ya estaba arrancado */
-    }
+    });
+  }
+
+  get listening() {
+    return !!this.rec;
   }
 
   stop() {
-    this.wanted = false;
-    this.rec?.stop();
+    const rec = this.rec;
     this.rec = null;
+    if (rec) {
+      rec.onresult = rec.onend = rec.onerror = null;
+      rec.abort?.();
+    }
   }
 }

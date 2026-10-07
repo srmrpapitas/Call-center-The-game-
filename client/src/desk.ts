@@ -4,23 +4,6 @@ import { audioCtx, sfx } from "./audio";
 import { faceFile } from "./characters";
 import { matchOption, VoiceInput } from "./voice";
 
-const store = {
-  get: (k: string) => {
-    try {
-      return localStorage.getItem(k);
-    } catch {
-      return null;
-    }
-  },
-  set: (k: string, v: string) => {
-    try {
-      localStorage.setItem(k, v);
-    } catch {
-      /* sin almacenamiento */
-    }
-  },
-};
-
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const ROUND_MS = 10000;
 
@@ -41,8 +24,10 @@ export class DeskUI {
   private clockTimer = 0;
   private audioEl: HTMLAudioElement | null = null;
   private voice = new VoiceInput();
-  private voiceOn = store.get("cc.voice") === "1";
-  current: CallDef | null = null; // llamada en curso (la usa también la prueba de humo)
+  /** Lo que hacer con una frase oída por voz en la ronda actual (también lo usa la prueba de humo). */
+  heard: (text: string) => void = () => {};
+  current: CallDef | null = null;
+  bankCode = ""; // nº de cuenta que dicta el cliente (lo lee también la prueba de humo) // llamada en curso (la usa también la prueba de humo)
   roundIdx = 0;
 
   /** Devuelve los puntos (0-9) o null si el jugador se levanta a mitad de llamada. */
@@ -56,6 +41,8 @@ export class DeskUI {
     $("c-say").textContent = "Marcando…";
     $("c-reply").classList.add("hidden");
     $("c-result").classList.add("hidden");
+    $("bank").classList.add("hidden");
+    $("c-talk").parentElement!.classList.remove("hidden");
     $("c-options").innerHTML = "";
     const who = CAST[castIdx % CAST.length];
     const alias = (text: string) => text.replaceAll("{alias}", who.alias);
@@ -85,10 +72,9 @@ export class DeskUI {
 
     $("d-cam").onclick = () => void this.toggleCam();
     $("d-mic").onclick = () => void this.toggleMic();
-    $("d-voice").onclick = () => this.toggleVoice();
-    this.voice.onHeard = () => {};
-    this.showVoice();
-    if (this.voiceOn) this.voice.start();
+    $("c-talk").onclick = () => this.talkOnce();
+    this.setTalk(false, VoiceInput.supported() ? "" : "Tu navegador no reconoce la voz: usa Chrome, Edge o Safari.");
+    $<HTMLButtonElement>("c-talk").disabled = true; // hasta que el cliente conteste
 
     this.current = call;
     this.roundIdx = 0;
@@ -120,6 +106,10 @@ export class DeskUI {
       // trato cerrado o cuelga: frase final del cliente y resultado
       const finish = (deal: boolean) => {
         clearInterval(timer);
+        this.heard = () => {};
+        this.voice.stop();
+        this.setTalk(false, "");
+        $<HTMLButtonElement>("c-talk").disabled = true;
         this.talk(false);
         $("c-options").innerHTML = "";
         $("c-timer").style.width = "0%";
@@ -128,18 +118,28 @@ export class DeskUI {
         rep.classList.remove("hidden");
         rep.textContent = call.react[key];
         void this.playSeq([audioFile(call.id, key)]);
-        const pts = deal ? (trust >= TRUST_WIN ? 9 : 6) : trust >= 40 ? 1 : 0;
+        $("c-talk").parentElement!.classList.add("hidden");
+        if (deal) {
+          sfx.done();
+          void this.openBank(call).then((emptied) => !finished && showResult(true, emptied));
+        } else showResult(false, false);
+      };
+
+      // trato: 5 (o 7 si la confianza llegó arriba) + 2 si vacías la cuenta; sin trato: 0 o 1
+      const showResult = (deal: boolean, emptied: boolean) => {
+        $("bank").classList.add("hidden");
+        const pts = deal ? (trust >= TRUST_WIN ? 7 : 5) + (emptied ? 2 : 0) : trust >= 40 ? 1 : 0;
         const msg = deal
-          ? trust >= TRUST_WIN
-            ? "¡Trato cerrado a lo grande! El jefe te deja comer sentado."
-            : "Trato cerrado. Tu supervisor te regala una galleta caducada."
+          ? emptied
+            ? "Cuenta vaciada. El jefe te deja comer sentado hoy."
+            : "Trato cerrado, pero sin botín. Tu supervisor te regala una galleta caducada."
           : pts > 0
             ? "Casi pica. Te descuentan el café de esta semana."
             : "Te ha colgado. El sistema te marca en rojo y tu silla pierde una rueda.";
         const r = $("c-result");
         r.classList.remove("hidden");
-        r.innerHTML = `<b>${deal ? "🤝 TRATO CERRADO" : "📵 CUELGA"} · +${pts} puntos de cuota</b><br>${msg}<br><button id="c-hang">Colgar (Enter)</button>`;
-        deal ? sfx.done() : sfx.bad();
+        r.innerHTML = `<b>${deal ? (emptied ? "💸 CUENTA VACIADA" : "🤝 TRATO CERRADO") : "📵 CUELGA"} · +${pts} puntos de cuota</b><br>${msg}<br><button id="c-hang">Colgar (Enter)</button>`;
+        if (!deal) sfx.bad();
         $("c-hang").onclick = () => end(pts);
         locked = false;
         this.onKey = (e) => {
@@ -151,7 +151,9 @@ export class DeskUI {
         if (locked) return;
         locked = true;
         clearInterval(timer);
-        this.voice.onHeard = () => {};
+        this.heard = () => {};
+        this.voice.stop();
+        this.setTalk(false);
         const n = this.roundIdx + 1;
         const opt = k === null ? null : call.rounds[this.roundIdx].options[k];
         const delta = opt ? opt.trust : SILENCE_REPLY.trust;
@@ -203,11 +205,12 @@ export class DeskUI {
           if (f <= 0) pick(null);
         }, 80);
         const texts = rd.options.map((o) => alias(o.t));
-        this.voice.onHeard = (heard) => {
+        this.heard = (heard) => {
           const i = matchOption(heard, texts);
-          $("d-heard").textContent = i >= 0 ? `Has dicho: «${heard}»` : `No te he entendido: «${heard}»`;
+          $("c-heard").textContent = i >= 0 ? `Has dicho: «${heard}»` : `No te he entendido: «${heard}». Repite o toca la frase.`;
           if (i >= 0) pick(i);
         };
+        $<HTMLButtonElement>("c-talk").disabled = !VoiceInput.supported();
         this.onKey = (e) => {
           if (e.key >= "1" && e.key <= "3") pick(Number(e.key) - 1);
           else if (e.key === "Escape") end(null);
@@ -245,29 +248,114 @@ export class DeskUI {
     }
   }
 
-  private toggleVoice() {
-    this.voiceOn = !this.voiceOn;
-    store.set("cc.voice", this.voiceOn ? "1" : "0");
-    if (this.voiceOn) this.voice.start();
-    else this.voice.stop();
-    this.showVoice();
+  // Banco: el cliente dicta su cuenta, la escribes a tiempo y la vacías. Devuelve si se vació.
+  private openBank(call: CallDef): Promise<boolean> {
+    const BANK_MS = 20000;
+    const code = Array.from({ length: 8 }, () => Math.floor(Math.random() * 10)).join("");
+    this.bankCode = code;
+    const input = $<HTMLInputElement>("b-acct");
+    const msg = $("b-msg");
+    $("bank").classList.remove("hidden");
+    $("b-login").classList.remove("hidden");
+    $("b-account").classList.add("hidden");
+    $("b-dict").textContent = `«${code.slice(0, 4)} ${code.slice(4)}»`;
+    input.value = "";
+    msg.textContent = "";
+    window.setTimeout(() => input.focus(), 50);
+    return new Promise((resolve) => {
+      let tries = 3;
+      let done = false;
+      const startAt = performance.now();
+      const timer = window.setInterval(() => {
+        const f = 1 - (performance.now() - startAt) / BANK_MS;
+        $("b-timer").style.width = `${Math.max(0, f * 100)}%`;
+        if (f <= 0) fail("⏰ Se acabó el tiempo. El cliente se ha ido a cenar.");
+      }, 100);
+      const fail = (text: string) => {
+        if (done) return;
+        done = true;
+        clearInterval(timer);
+        msg.textContent = text;
+        sfx.bad();
+        window.setTimeout(() => resolve(false), 1800);
+      };
+      const enter = () => {
+        if (done) return;
+        if (input.value.replace(/\D/g, "") === code) {
+          clearInterval(timer);
+          showAccount();
+          return;
+        }
+        tries--;
+        input.classList.remove("shake");
+        void input.offsetWidth;
+        input.classList.add("shake");
+        if (tries <= 0) fail("🚫 Demasiados intentos. El banco ha bloqueado la cuenta.");
+        else msg.textContent = `Número incorrecto. Te quedan ${tries} intentos.`;
+      };
+      $("b-enter").onclick = enter;
+      this.onKey = (e) => {
+        if (e.key === "Escape") fail("Has colgado sin vaciar la cuenta.");
+      };
+      input.onkeydown = (e) => e.key === "Enter" && enter();
+
+      const money = (n: number) => n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " $";
+      const showAccount = () => {
+        sfx.good();
+        $("b-login").classList.add("hidden");
+        $("b-account").classList.remove("hidden");
+        $("b-owner").textContent = call.customer;
+        const bal = $("b-bal");
+        bal.textContent = money(call.bank.balance);
+        bal.classList.remove("zero");
+        $("b-extra").textContent = call.bank.extra;
+        msg.textContent = "";
+        const btn = $<HTMLButtonElement>("b-empty");
+        btn.disabled = false;
+        btn.onclick = () => {
+          btn.disabled = true;
+          if (call.bank.balance <= 0) return fail("🎥 Era una cuenta trampa. Bob ya está subiendo el vídeo.");
+          const t0 = performance.now();
+          const anim = window.setInterval(() => {
+            const f = Math.min(1, (performance.now() - t0) / 1600);
+            bal.textContent = money(call.bank.balance * (1 - f));
+            if (Math.random() < 0.3) sfx.ok();
+            if (f >= 1) {
+              clearInterval(anim);
+              bal.classList.add("zero");
+              done = true;
+              msg.textContent = `💰 Botín: ${money(call.bank.balance)}`;
+              sfx.done();
+              window.setTimeout(() => resolve(true), 1500);
+            }
+          }, 60);
+        };
+      };
+    });
   }
 
-  private showVoice() {
-    const b = $<HTMLButtonElement>("d-voice");
-    if (!VoiceInput.supported()) {
-      b.disabled = true;
-      b.textContent = "Voz no disponible (usa Chrome o Edge)";
+  // «Hablar»: escucha una frase y elige la opción que más se parece
+  private talkOnce() {
+    if (this.voice.listening) {
+      this.voice.stop();
+      this.setTalk(false);
       return;
     }
-    b.textContent = this.voiceOn ? "🔴 Te escucho: lee una frase" : "Responder con la voz";
-    b.classList.toggle("on", this.voiceOn);
-    $("d-heard").textContent = this.voiceOn ? "Lee en voz alta la frase que elijas (o di «uno», «dos» o «tres»)." : "";
-    this.voice.onError = (msg) => {
-      this.voiceOn = false;
-      b.textContent = msg;
-      b.classList.remove("on");
-    };
+    this.setTalk(true, "Te escucho… lee la frase que elijas (o di «uno», «dos» o «tres»).");
+    this.voice
+      .listenOnce((partial) => ($("c-heard").textContent = `«${partial}»`))
+      .then((text) => {
+        this.setTalk(false);
+        this.heard(text);
+      })
+      .catch((err: Error) => this.setTalk(false, err.message));
+  }
+
+  private setTalk(on: boolean, msg?: string) {
+    const b = $<HTMLButtonElement>("c-talk");
+    b.classList.toggle("on", on);
+    b.textContent = on ? "🔴 Escuchando… (toca para parar)" : "🎙️ Hablar";
+    if (msg !== undefined) $("c-heard").textContent = msg;
   }
 
   private stopAudio() {
