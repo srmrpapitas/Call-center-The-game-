@@ -98,6 +98,7 @@
     .win button.small, .cam button, .mic button { background: #e7ecf3; border: 1px solid #c6cfdb; border-radius: 8px; padding: 6px 12px; font-size: 13px; }
     .meter { width: 90%; height: 12px; background: #dfe5ee; border-radius: 6px; overflow: hidden; }
     #d-meter { display: block; height: 100%; width: 0; background: var(--good); transition: width 0.06s; }
+    #d-voice.on { background: #fde6e6; border-color: var(--bad); font-weight: 700; }
     .mic small { color: #6b7a8e; text-align: center; padding: 0 10px; }
 
     @media (max-width: 760px) { .work { grid-template-columns: 1fr; } aside { display: none; } #help { display: none; } }
@@ -122,7 +123,7 @@
 
   <div id="desk" class="hidden">
     <div class="monitor">
-      <div class="topbar"><span>🖥️ Escritorio · <span id="d-time"></span></span><span id="d-esc">Esc: levantarse · 1 / 2 / 3: responder</span></div>
+      <div class="topbar"><span>🖥️ Escritorio · <span id="d-time"></span></span><span id="d-esc">Esc: levantarse · clic, 1 / 2 / 3 o tu voz: responder</span></div>
       <div class="work">
         <section class="win callwin">
           <header>📞 Llamada saliente · Guion: <span id="c-product"></span></header>
@@ -148,7 +149,8 @@
             <header style="align-self:stretch">🎙️ Tu voz</header>
             <div class="meter"><i id="d-meter"></i></div>
             <button id="d-mic">Activar micro</button>
-            <small>Medidor. Más adelante tu voz irá a la llamada.</small>
+            <button id="d-voice">Responder con la voz</button>
+            <small id="d-heard"></small>
           </section>
         </aside>
       </div>

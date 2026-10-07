@@ -86,13 +86,20 @@ try {
       const opts = ui.current.rounds[ui.roundIdx].options;
       return opts.indexOf(opts.reduce((a, b) => (b.trust > a.trust ? b : a)));
     });
-    await A.page.keyboard.press(String(best + 1));
+    if (i === 0) {
+      // por voz: se simula que el reconocimiento oye la frase leída
+      await A.page.evaluate((k) => {
+        const ui = window.__game.ui;
+        ui.voice.onHeard(document.querySelectorAll("#c-options button")[k].textContent.slice(2));
+      }, best);
+    } else if (i === 1) await A.page.click(`#c-options button:nth-child(${best + 1})`);
+    else await A.page.keyboard.press(String(best + 1));
     await sleep(2100);
   }
   await sleep(500);
   await A.page.screenshot({ path: `${OUT}/05-resultado.png` });
   const result = (await A.page.textContent("#c-result")).replace(/\s+/g, " ").trim();
-  note(/TRATO CERRADO.*puntos de cuota/.test(result), `Resultado de llamada: ${result.slice(0, 80)}`);
+  note(/TRATO CERRADO.*puntos de cuota/.test(result), `Trato cerrado respondiendo con voz, clic y tecla: ${result.slice(0, 80)}`);
   await A.page.keyboard.press("Enter");
   await sleep(1500);
   const scoreA = await A.page.textContent("#h-score");

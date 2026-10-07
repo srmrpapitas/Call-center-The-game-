@@ -26,7 +26,7 @@ npm run dev:server            # http://localhost:8787  (sirve también el client
 
 **El jefe:** una vez por turno, Don Bonifacio sale de Dirección y recorre la oficina. Suena una alarma y tenéis 8 segundos para sentaros en un puesto; quien le pille de pie resta 5 de cuota al equipo.
 
-Controles: `WASD` mover · `Mayús` correr · arrastrar ratón: cámara · rueda: zoom · `E` en un puesto para atender una llamada · `1/2/3` para responder · `Esc` levantarse.
+Controles: `WASD` mover · `Mayús` correr · arrastrar ratón: cámara · rueda: zoom · `E` en un puesto para hacer una llamada · para responder: clic en la frase, `1/2/3` o léela en voz alta (botón «Responder con la voz», en Chrome o Edge) · `Esc` levantarse.
 
 ## Coste cero
 

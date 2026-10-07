@@ -2,6 +2,24 @@ import { audioFile, reactionFor, SILENCE_REPLY, TRUST_DEAL, TRUST_START, TRUST_W
 import { CAST } from "./config";
 import { audioCtx, sfx } from "./audio";
 import { faceFile } from "./characters";
+import { matchOption, VoiceInput } from "./voice";
+
+const store = {
+  get: (k: string) => {
+    try {
+      return localStorage.getItem(k);
+    } catch {
+      return null;
+    }
+  },
+  set: (k: string, v: string) => {
+    try {
+      localStorage.setItem(k, v);
+    } catch {
+      /* sin almacenamiento */
+    }
+  },
+};
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const ROUND_MS = 10000;
@@ -22,6 +40,8 @@ export class DeskUI {
   private meterTimer = 0;
   private clockTimer = 0;
   private audioEl: HTMLAudioElement | null = null;
+  private voice = new VoiceInput();
+  private voiceOn = store.get("cc.voice") === "1";
   current: CallDef | null = null; // llamada en curso (la usa también la prueba de humo)
   roundIdx = 0;
 
@@ -55,6 +75,10 @@ export class DeskUI {
 
     $("d-cam").onclick = () => void this.toggleCam();
     $("d-mic").onclick = () => void this.toggleMic();
+    $("d-voice").onclick = () => this.toggleVoice();
+    this.voice.onHeard = () => {};
+    this.showVoice();
+    if (this.voiceOn) this.voice.start();
 
     this.current = call;
     this.roundIdx = 0;
@@ -117,6 +141,7 @@ export class DeskUI {
         if (locked) return;
         locked = true;
         clearInterval(timer);
+        this.voice.onHeard = () => {};
         const n = this.roundIdx + 1;
         const opt = k === null ? null : call.rounds[this.roundIdx].options[k];
         const delta = opt ? opt.trust : SILENCE_REPLY.trust;
@@ -167,6 +192,12 @@ export class DeskUI {
           $("c-timer").style.width = `${Math.max(0, f * 100)}%`;
           if (f <= 0) pick(null);
         }, 80);
+        const texts = rd.options.map((o) => alias(o.t));
+        this.voice.onHeard = (heard) => {
+          const i = matchOption(heard, texts);
+          $("d-heard").textContent = i >= 0 ? `Has dicho: «${heard}»` : `No te he entendido: «${heard}»`;
+          if (i >= 0) pick(i);
+        };
         this.onKey = (e) => {
           if (e.key >= "1" && e.key <= "3") pick(Number(e.key) - 1);
           else if (e.key === "Escape") end(null);
@@ -202,6 +233,31 @@ export class DeskUI {
       });
       if (this.audioEl !== el) return; // la cortó otro audio o se colgó la llamada
     }
+  }
+
+  private toggleVoice() {
+    this.voiceOn = !this.voiceOn;
+    store.set("cc.voice", this.voiceOn ? "1" : "0");
+    if (this.voiceOn) this.voice.start();
+    else this.voice.stop();
+    this.showVoice();
+  }
+
+  private showVoice() {
+    const b = $<HTMLButtonElement>("d-voice");
+    if (!VoiceInput.supported()) {
+      b.disabled = true;
+      b.textContent = "Voz no disponible (usa Chrome o Edge)";
+      return;
+    }
+    b.textContent = this.voiceOn ? "🔴 Te escucho: lee una frase" : "Responder con la voz";
+    b.classList.toggle("on", this.voiceOn);
+    $("d-heard").textContent = this.voiceOn ? "Lee en voz alta la frase que elijas (o di «uno», «dos» o «tres»)." : "";
+    this.voice.onError = (msg) => {
+      this.voiceOn = false;
+      b.textContent = msg;
+      b.classList.remove("on");
+    };
   }
 
   private stopAudio() {
@@ -261,6 +317,7 @@ export class DeskUI {
 
   private close() {
     this.active = false;
+    this.voice.stop();
     this.onKey = null;
     $("desk").classList.add("hidden");
     clearInterval(this.clockTimer);
