@@ -8,6 +8,8 @@ export interface Avatar {
   body: THREE.Group;
   head: THREE.Group; // pivote en el cuello: se balancea al hablar
   talking: boolean;
+  jaw: THREE.Object3D | null; // parte de abajo de la foto: sube y baja al hablar
+  jawY: number;
   legL: THREE.Mesh;
   legR: THREE.Mesh;
   armL: THREE.Mesh;
@@ -23,6 +25,8 @@ function limb(w: number, h: number, d: number, m: THREE.Material, x: number, y: 
 }
 
 // Caras opcionales: public/faces/<nombre>.png (p. ej. lucia.png). Si no existe, se dejan los ojos.
+// La foto se parte a esta altura (desde abajo, 0-1) para mover la mandíbula como un muñeco de cartón.
+export const JAW_SPLIT = 0.36;
 const faceLoader = new THREE.TextureLoader();
 export const faceFile = (name: string) =>
   name.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + ".png";
@@ -62,13 +66,28 @@ export function buildAvatar(look: number | CastDef): Avatar {
     const eye = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.09, 0.05), dark);
     eyes.push(onHead(eye, sx, 2.04, 0.37));
   }
-  // foto de la cara pegada delante, como una careta
+  // foto de la cara pegada delante, como una careta, partida en dos para mover la boca
+  // (la textura carga siempre después de devolver el avatar, así que `result` ya existe)
   faceLoader.load(
     `faces/${faceFile(d.name)}`,
     (tex) => {
       tex.colorSpace = THREE.SRGBColorSpace;
-      const face = new THREE.Mesh(new THREE.PlaneGeometry(0.66, 0.74), new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
-      onHead(face, 0, 1.98, 0.42);
+      const W = 0.66, H = 0.74, CY = 1.98, Z = 0.42;
+      const part = (from: number, to: number) => {
+        const t = tex.clone();
+        t.repeat.set(1, to - from);
+        t.offset.set(0, from);
+        t.needsUpdate = true;
+        return new THREE.Mesh(new THREE.PlaneGeometry(W, H * (to - from)), new THREE.MeshBasicMaterial({ map: t, transparent: true }));
+      };
+      const bottom = CY - H / 2;
+      onHead(part(JAW_SPLIT, 1), 0, bottom + (H * (1 + JAW_SPLIT)) / 2, Z);
+      const jaw = onHead(part(0, JAW_SPLIT), 0, bottom + (H * JAW_SPLIT) / 2, Z + 0.002);
+      // hueco oscuro de la boca, detrás de la mandíbula
+      const mouth = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.4, 0.12), new THREE.MeshBasicMaterial({ color: 0x2a0a0a }));
+      onHead(mouth, 0, bottom + H * JAW_SPLIT - 0.04, Z - 0.004);
+      result.jaw = jaw;
+      result.jawY = jaw.position.y;
       eyes.forEach((e) => (e.visible = false));
     },
     undefined,
@@ -118,7 +137,8 @@ export function buildAvatar(look: number | CastDef): Avatar {
   const armR = limb(0.2, 0.75, 0.22, shirt, 0.5, 1.65);
   body.add(legL, legR, armL, armR);
 
-  return { group, body, head: headG, talking: false, legL, legR, armL, armR };
+  const result: Avatar = { group, body, head: headG, talking: false, jaw: null, jawY: 0, legL, legR, armL, armR };
+  return result;
 }
 
 export function animateAvatar(a: Avatar, t: number, moving: boolean) {
@@ -131,4 +151,9 @@ export function animateAvatar(a: Avatar, t: number, moving: boolean) {
   // al hablar por teléfono, la cabeza se balancea de lado a lado
   const goal = a.talking ? Math.sin(t * 7) * 0.22 + Math.sin(t * 2.3) * 0.06 : 0;
   a.head.rotation.z += (goal - a.head.rotation.z) * 0.25;
+  if (a.jaw) {
+    // boca: abre y cierra a golpes irregulares, como al hablar
+    const open = a.talking ? Math.max(0, Math.sin(t * 15) * 0.7 + Math.sin(t * 6.1) * 0.5) * 0.06 : 0;
+    a.jaw.position.y = a.jawY - open;
+  }
 }

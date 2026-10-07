@@ -59,11 +59,18 @@ export class DeskUI {
     $("c-options").innerHTML = "";
     const who = CAST[castIdx % CAST.length];
     const alias = (text: string) => text.replaceAll("{alias}", who.alias);
-    $("d-avatar").textContent = who.name.slice(0, 1);
-    $("d-avatar").style.background = `url("faces/${faceFile(who.name)}") center / cover no-repeat, #${who.shirt.toString(16).padStart(6, "0")}`;
-    const img = new Image(); // con foto, se quita la inicial
-    img.onload = () => ($("d-avatar").textContent = "");
-    img.src = `faces/${faceFile(who.name)}`;
+    // webcam falsa: la foto del personaje (si existe) o su inicial
+    const url = `faces/${faceFile(who.name)}`;
+    $("d-avatar").style.background = `#${who.shirt.toString(16).padStart(6, "0")}`;
+    $("d-initial").textContent = who.name.slice(0, 1);
+    $("d-face").classList.add("hidden");
+    const img = new Image();
+    img.onload = () => {
+      $("d-initial").textContent = "";
+      for (const el of $("d-face").querySelectorAll<HTMLElement>(".top, .jaw")) el.style.backgroundImage = `url("${url}")`;
+      $("d-face").classList.remove("hidden");
+    };
+    img.src = url;
     $("d-esc").classList.remove("hidden");
 
     const tick = () => {

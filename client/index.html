@@ -51,8 +51,22 @@
     #toast { position: fixed; top: 70px; left: 50%; transform: translateX(-50%); background: #11161de6; border: 1px solid #ffffff2a; border-radius: 10px; padding: 9px 16px; z-index: 30; }
     #boss-alert { position: fixed; top: 120px; left: 50%; transform: translateX(-50%); background: #b02a30f0; border: 2px solid #ffd27a; border-radius: 12px; padding: 10px 18px; font-weight: 800; z-index: 31; animation: pulse 0.6s ease-in-out infinite alternate; }
     @keyframes pulse { from { transform: translateX(-50%) scale(1); } to { transform: translateX(-50%) scale(1.06); } }
-    #d-avatar.talking { animation: wobble 0.45s ease-in-out infinite alternate; }
-    @keyframes wobble { from { transform: rotate(-9deg); } to { transform: rotate(9deg); } }
+    /* webcam falsa: la foto partida en dos; la mandíbula sube y baja y la persona se mueve al hablar */
+    #d-avatar { position: relative; overflow: hidden; }
+    #d-face { position: absolute; height: 94%; aspect-ratio: 1; left: 50%; top: 6%; transform: translateX(-50%); }
+    #d-face > div { position: absolute; inset: 0; background-size: 100% 100%; }
+    #d-face .top { clip-path: inset(0 0 36% 0); }
+    #d-face .jaw { clip-path: inset(64% 0 0 0); }
+    #d-face .mouth { inset: 60% 33% 31% 33%; background: #2a0a0a; border-radius: 50%; }
+    #d-avatar.talking #d-face { animation: webcam 1.3s ease-in-out infinite alternate; }
+    #d-avatar.talking #d-face .jaw { animation: jaw 0.17s ease-in-out infinite alternate; }
+    @keyframes webcam {
+      0% { transform: translateX(-50%) rotate(-7deg); }
+      35% { transform: translateX(-46%) translateY(2%) rotate(5deg) scale(1.04); }
+      70% { transform: translateX(-54%) translateY(-1%) rotate(-3deg) scale(1.08); }
+      100% { transform: translateX(-50%) translateY(1%) rotate(8deg) scale(1.02); }
+    }
+    @keyframes jaw { from { transform: translateY(0); } to { transform: translateY(7%); } }
     #help { position: fixed; left: 12px; bottom: 12px; color: #ffffffa0; font-size: 12px; background: #11161d99; padding: 6px 10px; border-radius: 8px; }
     #labels { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
     .tag { position: absolute; left: 0; top: 0; background: #11161dcc; border-radius: 6px; padding: 2px 8px; font-size: 13px; font-weight: 600; white-space: nowrap; }
@@ -142,7 +156,7 @@
           <section class="win cam">
             <header style="align-self:stretch">📷 Tu cámara</header>
             <video id="d-video" class="hidden" autoplay muted playsinline></video>
-            <div class="noavatar" id="d-avatar"></div>
+            <div class="noavatar" id="d-avatar"><span id="d-initial"></span><div id="d-face" class="hidden"><div class="mouth"></div><div class="top"></div><div class="jaw"></div></div></div>
             <button id="d-cam">Activar cámara</button>
           </section>
           <section class="win mic">
