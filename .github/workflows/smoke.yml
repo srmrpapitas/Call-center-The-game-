@@ -1,0 +1,32 @@
+# Prueba automática: arranca el Worker en local, abre dos navegadores y comprueba el juego.
+name: Prueba de humo
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Compilar cliente
+        run: cd client && npm install && npm run build
+      - name: Instalar servidor y Playwright
+        run: |
+          cd worker && npm install
+          cd .. && npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Arrancar Worker local
+        run: |
+          cd worker
+          nohup npx wrangler dev --port 8787 > /tmp/wrangler.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://localhost:8787/health && break; sleep 2; done
+          curl -sf http://localhost:8787/health || { tail -30 /tmp/wrangler.log | while IFS= read -r l; do echo "::error::wrangler: $l"; done; exit 1; }
+      - name: Jugar
+        run: node scripts/smoke.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: capturas
+          path: smoke-out/
