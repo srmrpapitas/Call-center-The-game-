@@ -17,7 +17,10 @@ jobs:
       - name: Servidor (typecheck)
         run: |
           cd worker
-          npm install 2>&1 | tail -15
+          npm install > /tmp/npm.txt 2>&1 || {
+            tail -15 /tmp/npm.txt | while IFS= read -r l; do echo "::error::npm: $l"; done
+            exit 1
+          }
           npx tsc --noEmit --pretty false > /tmp/tsc.txt 2>&1 || {
             while IFS= read -r l; do echo "::error::$l"; done < /tmp/tsc.txt
             exit 1
