@@ -1,6 +1,7 @@
 // Llamadas de la v0: guionizadas, con clientes ficticios y absurdos (sátira de humor negro).
-// Cada línea puede llevar un audio opcional (public/audio/calls/<archivo>) para sustituir al texto
-// por tus grabaciones: basta con rellenar el campo `audio`.
+// Cada línea busca su audio en public/audio/calls/ con el nombre que da audioFile() (p. ej.
+// vlad_r1_cliente.mp3). Si el archivo no existe, se muestra solo el texto. Los campos `audio`
+// sirven para usar otro nombre o formato. La lista completa: `npm run guion` (GUION-AUDIOS.md).
 
 export interface CallOption {
   t: string; // lo que dice el jugador
@@ -346,6 +347,16 @@ export const CALLS: CallDef[] = [
     ],
   },
 ];
+
+export type LineKind = "cliente" | "jugador" | "respuesta";
+
+/** Nombre del audio por convención. `opt` es 1, 2 o 3 (no hace falta para "cliente"). */
+export function audioFile(callId: string, round: number, kind: LineKind, opt?: number): string {
+  return kind === "cliente" ? `${callId}_r${round}_cliente.mp3` : `${callId}_r${round}_op${opt}_${kind}.mp3`;
+}
+
+/** Lo que dice el cliente si se acaba el tiempo sin responder. */
+export const SILENCE_REPLY = { text: "…¿Hola? ¿Sigue usted ahí?", audio: "general_silencio.mp3" };
 
 export function pickCall(last?: string): CallDef {
   const pool = CALLS.filter((c) => c.id !== last);
