@@ -1,0 +1,15 @@
+{
+  "name": "call-center-the-game",
+  "private": true,
+  "scripts": {
+    "dev:client": "npm --prefix client run dev",
+    "build:client": "npm --prefix client run build",
+    "dev:server": "npm --prefix worker run dev",
+    "deploy:server": "npm --prefix client run build && npm --prefix worker run deploy",
+    "icons": "tauri icon src-tauri/app-icon.png",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0"
+  }
+}

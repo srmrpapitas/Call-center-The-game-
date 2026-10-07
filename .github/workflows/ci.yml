@@ -1,0 +1,27 @@
+name: CI
+on:
+  push:
+  pull_request:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Cliente (typecheck + build)
+        run: |
+          cd client
+          npm install
+          npm run build
+      - name: Servidor (typecheck)
+        run: |
+          cd worker
+          npm install > /tmp/npm.txt 2>&1 || {
+            tail -15 /tmp/npm.txt | while IFS= read -r l; do echo "::error::npm: $l"; done
+            exit 1
+          }
+          npx tsc --noEmit --pretty false > /tmp/tsc.txt 2>&1 || {
+            while IFS= read -r l; do echo "::error::$l"; done < /tmp/tsc.txt
+            exit 1
+          }
