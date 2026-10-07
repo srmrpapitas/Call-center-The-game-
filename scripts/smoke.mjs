@@ -94,7 +94,14 @@ try {
       }, best);
     } else if (i === 1) await A.page.click(`#c-options button:nth-child(${best + 1})`);
     else await A.page.keyboard.press(String(best + 1));
-    await sleep(2100);
+    // la ronda siguiente llega cuando el cliente termina de hablar (con audios puede tardar)
+    await A.page.waitForFunction(
+      (n) =>
+        !document.querySelector("#c-result").classList.contains("hidden") ||
+        (window.__game.ui.roundIdx === n && document.querySelectorAll("#c-options button:not([disabled])").length === 3),
+      i + 1,
+      { timeout: 40000 },
+    );
   }
   await sleep(500);
   await A.page.screenshot({ path: `${OUT}/05-resultado.png` });
