@@ -73,6 +73,9 @@ export class Game {
     this.resize();
     window.addEventListener("resize", () => this.resize());
     this.bindInput();
+    this.ui.onTalk = (on) => {
+      if (this.me) this.me.av.talking = on;
+    };
     // fondo del menú: cámara girando suavemente
     this.camera.position.set(0, 7, 14);
     this.camera.lookAt(0, 1, 0);
@@ -182,6 +185,7 @@ export class Game {
           r.tz = m.z;
           r.try_ = m.ry;
           r.moving = !!m.m;
+          r.av.talking = !!m.c;
         }
         break;
       }
@@ -329,7 +333,7 @@ export class Game {
     const now = performance.now();
     if (this.online && now - this.lastSend > 70) {
       this.lastSend = now;
-      this.net.send({ t: "s", x: +me.pos.x.toFixed(2), z: +me.pos.z.toFixed(2), ry: +me.ry.toFixed(2), m: me.moving });
+      this.net.send({ t: "s", x: +me.pos.x.toFixed(2), z: +me.pos.z.toFixed(2), ry: +me.ry.toFixed(2), m: me.moving, c: me.av.talking });
     }
   }
 
