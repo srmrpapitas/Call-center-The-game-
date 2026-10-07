@@ -4,26 +4,28 @@ name: Deploy servidor
 on:
   push:
     branches: [main]
-    paths: ["client/**", "worker/**", ".github/workflows/deploy-server.yml"]
   workflow_dispatch:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    env:
-      HAS_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v4
+      - name: Comprobar token
+        id: check
+        env:
+          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -n "$TOKEN" ]; then echo "has=true" >> "$GITHUB_OUTPUT"; else echo "has=false" >> "$GITHUB_OUTPUT"; echo "Sin CLOUDFLARE_API_TOKEN: despliegue omitido."; fi
       - uses: actions/setup-node@v4
-        with: { node-version: 22 }
+        if: steps.check.outputs.has == 'true'
+        with:
+          node-version: 22
       - name: Compilar cliente web
-        if: env.HAS_TOKEN == 'true'
+        if: steps.check.outputs.has == 'true'
         run: cd client && npm install && npm run build
       - name: Desplegar en Cloudflare
-        if: env.HAS_TOKEN == 'true'
+        if: steps.check.outputs.has == 'true'
         run: cd worker && npm install && npx wrangler deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      - name: Aviso
-        if: env.HAS_TOKEN != 'true'
-        run: echo "Sin CLOUDFLARE_API_TOKEN: despliegue omitido."
